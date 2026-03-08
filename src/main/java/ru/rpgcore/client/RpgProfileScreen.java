@@ -21,18 +21,30 @@ public final class RpgProfileScreen extends Screen {
 
     @Override
     protected void init() {
+        super.init();
+
         ClientProfileCache.clear();
         if (Minecraft.getInstance().player != null) {
             RpgNetwork.CHANNEL.sendToServer(new C2S_RequestProfile());
         }
 
         int centerX = this.width / 2;
-        int y = this.height / 2 + 40;
+        int bottomY = this.height - 34;
+
+        addRenderableWidget(Button.builder(
+                Component.translatable("rpg_core.gui.menu.class"),
+                btn -> Minecraft.getInstance().setScreen(new RpgClassScreen())
+        ).bounds(centerX - 160, bottomY, 100, 20).build());
+
+        addRenderableWidget(Button.builder(
+                Component.translatable("rpg_core.gui.menu.perks"),
+                btn -> Minecraft.getInstance().setScreen(new RpgPerksScreen())
+        ).bounds(centerX - 50, bottomY, 100, 20).build());
 
         addRenderableWidget(Button.builder(
                 Component.translatable("rpg_core.gui.back"),
-                btn -> Minecraft.getInstance().setScreen(new RpgMenuScreen())
-        ).bounds(centerX - 50, y, 100, 20).build());
+                btn -> Minecraft.getInstance().setScreen(null)
+        ).bounds(centerX + 60, bottomY, 100, 20).build());
     }
 
     private static Component classNameFromId(String classId) {
@@ -51,54 +63,74 @@ public final class RpgProfileScreen extends Screen {
         super.render(gfx, mouseX, mouseY, partialTick);
 
         int center = this.width / 2;
-        int y = this.height / 2 - 70;
+        int y = this.height / 2 - 80;
 
         gfx.drawCenteredString(this.font, this.title, center, y, 0xFFFFFF);
         y += 18;
 
         S2C_ProfileData d = ClientProfileCache.get();
         if (d == null) {
-            gfx.drawCenteredString(this.font,
+            gfx.drawCenteredString(
+                    this.font,
                     Component.translatable("rpg_core.gui.profile.loading"),
-                    center, y, 0xAAAAAA);
+                    center, y, 0xAAAAAA
+            );
             return;
         }
 
-        gfx.drawCenteredString(this.font,
+        gfx.drawCenteredString(
+                this.font,
                 Component.translatable("rpg_core.gui.profile.level", d.level, d.maxLevel),
-                center, y, 0xFFFFFF);
+                center, y, 0xFFFFFF
+        );
         y += 14;
 
-        gfx.drawCenteredString(this.font,
+        gfx.drawCenteredString(
+                this.font,
                 Component.translatable("rpg_core.gui.profile.total_xp", d.xp),
-                center, y, 0xAAAAAA);
+                center, y, 0xAAAAAA
+        );
         y += 14;
 
         if (d.xpToNext < 0) {
-            gfx.drawCenteredString(this.font,
+            gfx.drawCenteredString(
+                    this.font,
                     Component.translatable("rpg_core.gui.profile.xp_to_next_max"),
-                    center, y, 0xAAAAAA);
+                    center, y, 0xAAAAAA
+            );
         } else {
-            gfx.drawCenteredString(this.font,
+            gfx.drawCenteredString(
+                    this.font,
                     Component.translatable("rpg_core.gui.profile.xp_to_next", d.xpToNext),
-                    center, y, 0xAAAAAA);
+                    center, y, 0xAAAAAA
+            );
         }
         y += 14;
 
-        // ✅ 3 значения (и под это мы поправили lang)
-        gfx.drawCenteredString(this.font,
-                Component.translatable("rpg_core.gui.profile.tokens", d.tokensTotal, d.tokensSpent, d.tokensAvailable),
-                center, y, 0x55FF55);
+        gfx.drawCenteredString(
+                this.font,
+                Component.translatable(
+                        "rpg_core.gui.profile.tokens",
+                        d.tokensTotal,
+                        d.tokensSpent,
+                        d.tokensAvailable
+                ),
+                center, y, 0x55FF55
+        );
         y += 14;
 
         if (d.classId != null && !d.classId.isBlank()) {
-            gfx.drawCenteredString(this.font,
+            gfx.drawCenteredString(
+                    this.font,
                     Component.translatable("rpg_core.gui.profile.class", classNameFromId(d.classId)),
-                    center, y, 0x55FFFF);
+                    center, y, 0x55FFFF
+            );
         } else {
-            gfx.drawCenteredString(this.font,
+            gfx.drawCenteredString(
+                    this.font,
                     Component.translatable("rpg_core.gui.profile.class_none"),
-                    center, y, 0xFF5555);
+                    center, y, 0xFF5555
+            );
         }
     }
 
@@ -106,4 +138,5 @@ public final class RpgProfileScreen extends Screen {
     public boolean isPauseScreen() {
         return false;
     }
+
 }

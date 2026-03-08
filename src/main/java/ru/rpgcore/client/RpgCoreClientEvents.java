@@ -26,10 +26,9 @@ public final class RpgCoreClientEvents {
         if (mc.player == null) return;
 
         while (RpgCoreClient.OPEN_MENU != null && RpgCoreClient.OPEN_MENU.consumeClick()) {
-            mc.setScreen(new RpgMenuScreen());
+            mc.setScreen(new RpgCharacterScreen());
         }
 
-        // request profile every ~2 seconds so HUD reacts to gamerule toggle quickly
         profileSyncTick++;
         if (profileSyncTick >= 40) {
             profileSyncTick = 0;

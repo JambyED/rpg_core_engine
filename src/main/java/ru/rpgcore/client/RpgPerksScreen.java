@@ -48,26 +48,44 @@ public final class RpgPerksScreen extends Screen {
         int cx = this.width / 2;
         int startY = this.height / 2 - (BTN_H * 2) - GAP;
 
-        b1 = addRenderableWidget(Button.builder(Component.translatable("rpg_core.gui.perks.loading"), btn -> onPick(0))
-                .bounds(cx - BTN_W / 2, startY, BTN_W, BTN_H).build());
+        b1 = addRenderableWidget(Button.builder(
+                        Component.translatable("rpg_core.gui.perks.loading"),
+                        btn -> onPick(0))
+                .bounds(cx - BTN_W / 2, startY, BTN_W, BTN_H)
+                .build());
 
-        b2 = addRenderableWidget(Button.builder(Component.translatable("rpg_core.gui.perks.loading"), btn -> onPick(1))
-                .bounds(cx - BTN_W / 2, startY + (BTN_H + GAP), BTN_W, BTN_H).build());
+        b2 = addRenderableWidget(Button.builder(
+                        Component.translatable("rpg_core.gui.perks.loading"),
+                        btn -> onPick(1))
+                .bounds(cx - BTN_W / 2, startY + (BTN_H + GAP), BTN_W, BTN_H)
+                .build());
 
-        b3 = addRenderableWidget(Button.builder(Component.translatable("rpg_core.gui.perks.loading"), btn -> onPick(2))
-                .bounds(cx - BTN_W / 2, startY + 2 * (BTN_H + GAP), BTN_W, BTN_H).build());
+        b3 = addRenderableWidget(Button.builder(
+                        Component.translatable("rpg_core.gui.perks.loading"),
+                        btn -> onPick(2))
+                .bounds(cx - BTN_W / 2, startY + 2 * (BTN_H + GAP), BTN_W, BTN_H)
+                .build());
 
         int yBack = this.height - 58;
         int yBottom = this.height - 34;
 
-        back = addRenderableWidget(Button.builder(Component.translatable("rpg_core.gui.back"), btn -> onBack())
-                .bounds(cx - 60, yBack, 120, 20).build());
+        back = addRenderableWidget(Button.builder(
+                        Component.translatable("rpg_core.gui.back"),
+                        btn -> onBack())
+                .bounds(cx - 60, yBack, 120, 20)
+                .build());
 
-        confirm = addRenderableWidget(Button.builder(Component.translatable("rpg_core.gui.perks.confirm"), btn -> onConfirm())
-                .bounds(cx - 110, yBottom, 100, 20).build());
+        confirm = addRenderableWidget(Button.builder(
+                        Component.translatable("rpg_core.gui.perks.confirm"),
+                        btn -> onConfirm())
+                .bounds(cx - 110, yBottom, 100, 20)
+                .build());
 
-        clear = addRenderableWidget(Button.builder(Component.translatable("rpg_core.gui.perks.clear"), btn -> onClear())
-                .bounds(cx + 10, yBottom, 100, 20).build());
+        clear = addRenderableWidget(Button.builder(
+                        Component.translatable("rpg_core.gui.perks.clear"),
+                        btn -> onClear())
+                .bounds(cx + 10, yBottom, 100, 20)
+                .build());
 
         setPerkButtonsActive(false);
         confirm.active = false;
@@ -77,7 +95,7 @@ public final class RpgPerksScreen extends Screen {
     }
 
     private void onBack() {
-        Minecraft.getInstance().setScreen(new RpgMenuScreen());
+        Minecraft.getInstance().setScreen(new RpgCharacterScreen());
     }
 
     private void requestOffers() {
@@ -103,7 +121,7 @@ public final class RpgPerksScreen extends Screen {
 
     private void setLoadingLabels() {
         Component t = Component.translatable("rpg_core.gui.perks.loading");
-        b1.setMessage(t);
+                b1.setMessage(t);
         b2.setMessage(t);
         b3.setMessage(t);
     }
@@ -150,7 +168,6 @@ public final class RpgPerksScreen extends Screen {
 
         waitingChooseResult = true;
 
-        // show final state immediately
         confirmedSelection = pendingSelection;
         pendingSelection = null;
 
@@ -160,7 +177,6 @@ public final class RpgPerksScreen extends Screen {
 
         updateButtonCaptions();
 
-        // ✅ CRITICAL FIX: clear profile cache so we wait for NEW S2C_ProfileData
         ClientProfileCache.clear();
 
         RpgNetwork.CHANNEL.sendToServer(new C2S_ChoosePerk(currentTier, confirmedSelection.toString()));
@@ -175,7 +191,11 @@ public final class RpgPerksScreen extends Screen {
             waitingOffers = false;
 
             if (offersMsg.errorKey != null && !offersMsg.errorKey.isBlank()) {
-                errorMessage = Component.translatable(offersMsg.errorKey, offersMsg.errorArg);
+                if ("rpg_core.perks.offers.none_level".equals(offersMsg.errorKey)) {
+                    errorMessage = Component.translatable(offersMsg.errorKey, offersMsg.errorArg, offersMsg.tier);
+                } else {
+                    errorMessage = Component.translatable(offersMsg.errorKey, offersMsg.errorArg);
+                }
 
                 setPerkButtonsActive(false);
                 confirm.active = false;
@@ -203,7 +223,6 @@ public final class RpgPerksScreen extends Screen {
             updateButtonCaptions();
         }
 
-        // After confirm: wait for NEW profile packet, then request next offers
         if (waitingChooseResult) {
             if (ClientProfileCache.get() != null) {
                 waitingChooseResult = false;
@@ -246,9 +265,13 @@ public final class RpgPerksScreen extends Screen {
     }
 
     private static Component getPerkDisplayName(ResourceLocation id) {
+        if (id == null) return Component.empty();
+
         RpgPerk perk = RpgPerkRegistries.registry().getValue(id);
-        return (perk != null) ? perk.
-                displayName() : Component.literal(id.toString());
+        if (perk != null && perk.displayName() != null) {
+            return perk.displayName();
+        }
+        return Component.literal(id.toString());
     }
 
     @Override
@@ -256,34 +279,21 @@ public final class RpgPerksScreen extends Screen {
         this.renderBackground(gfx);
         super.render(gfx, mouseX, mouseY, partialTick);
 
-        gfx.drawCenteredString(this.font, this.title, this.width / 2, 18, 0xFFFFFF);
+        int cx = this.width / 2;
+        int y = 18;
 
-        if (waitingOffers) {
-            gfx.drawCenteredString(
-                    this.font,
-                    Component.translatable("rpg_core.gui.perks.loading"),
-                    this.width / 2,
-                    this.height / 2 - 60,
-                    0xAAAAAA
-            );
-        } else if (errorMessage != null) {
-            gfx.drawCenteredString(this.font, errorMessage, this.width / 2, this.height / 2 - 60, 0xFF5555);
-        } else if (currentTier > 0) {
-            gfx.drawCenteredString(
-                    this.font,
-                    Component.translatable("rpg_core.gui.perks.offer_title", currentTier),
-                    this.width / 2,
-                    this.height / 2 - 60,
-                    0xAAAAAA
-            );
+        gfx.drawCenteredString(this.font, this.title, cx, y, 0xFFFFFF);
+        y += 14;
 
-            gfx.drawCenteredString(
-                    this.font,
-                    Component.translatable("rpg_core.gui.perks.confirm_hint"),
-                    this.width / 2,
-                    this.height - 46,
-                    0xAAAAAA
-            );
+        if (errorMessage != null) {
+            gfx.drawCenteredString(this.font, errorMessage, cx, y, 0xFF5555);
+            return;
+        }
+
+        if (pendingSelection != null && confirmedSelection == null) {
+            gfx.drawCenteredString(this.font,
+                    Component.translatable("rpg_core.gui.perks.click_confirm"),
+                    cx, y, 0x55FFFF);
         }
     }
 

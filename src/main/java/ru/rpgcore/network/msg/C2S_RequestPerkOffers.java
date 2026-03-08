@@ -44,7 +44,8 @@ public final class C2S_RequestPerkOffers {
             int maxTierAllowed = Math.min(worldMaxTiers, profile.level() / 5);
 
             if (maxTierAllowed <= 0) {
-                sendError(player, "rpg_core.perks.offers.none_level", 0);
+                // ВАЖНО: errorArg = tier, который будет открыт первым (tier=1 -> нужен уровень 5)
+                sendError(player, "rpg_core.perks.offers.none_level", 1); // arg = tier to unlock
                 return;
             }
 

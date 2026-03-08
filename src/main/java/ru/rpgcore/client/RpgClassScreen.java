@@ -46,7 +46,7 @@ public final class RpgClassScreen extends Screen {
 
         addRenderableWidget(Button.builder(
                 Component.translatable("rpg_core.gui.back"),
-                b -> Minecraft.getInstance().setScreen(new RpgMenuScreen())
+                b -> Minecraft.getInstance().setScreen(new RpgCharacterScreen())
         ).bounds(cx - 110, this.height - 34, 100, 20).build());
 
         chooseBtn = addRenderableWidget(Button.builder(
@@ -202,25 +202,20 @@ public final class RpgClassScreen extends Screen {
             gfx.fill(startX, y, startX + 1, y + CARD_H, border);
             gfx.fill(startX + CARD_W - 1, y, startX + CARD_W, y + CARD_H, border);
 
-            // Icon placeholder (пока без текстур)
             int iconX = startX + ICON_PAD;
             int iconY = y + (CARD_H - ICON_SIZE) / 2;
             gfx.fill(iconX, iconY, iconX + ICON_SIZE, iconY + ICON_SIZE, 0xFF222222);
 
             int textX = iconX + ICON_SIZE + 12;
 
-            // Name
             gfx.drawString(this.font, className(id), textX, y + 10, 0xFFFFFF, false);
-            // Desc
             gfx.drawString(this.font, classDesc(id), textX, y + 26, 0xAAAAAA, false);
-            // Stats
             gfx.drawString(this.font, classStat(id, 1), textX, y + 44, 0x55FF55, false);
             gfx.drawString(this.font, classStat(id, 2), textX, y + 56, 0x55FF55, false);
 
             y += CARD_H + GAP;
         }
 
-        // ✅ Scrollbar + hint (only when needed)
         if (ids.size() > visible) {
             drawScrollBar(gfx, ids.size(), visible);
 
@@ -235,7 +230,6 @@ public final class RpgClassScreen extends Screen {
 
         chooseBtn.active = data.canChoose && selected != null;
     }
-
     private void drawScrollBar(GuiGraphics gfx, int total, int visible) {
         if (total <= visible) return;
 
@@ -246,7 +240,6 @@ public final class RpgClassScreen extends Screen {
         int top = 56;
         int bottom = this.height - 60;
 
-        // track
         gfx.fill(barX, top, barX + 4, bottom, 0x66000000);
 
         int trackH = Math.max(1, bottom - top);
