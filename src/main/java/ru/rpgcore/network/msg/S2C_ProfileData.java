@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 public final class S2C_ProfileData {
-
-    // базовые поля (как было)
     public final int level;
     public final int maxLevel;
     public final int xp;
@@ -20,6 +18,8 @@ public final class S2C_ProfileData {
     public final int tokensSpent;
     public final int tokensAvailable;
 
+    public final long balance;
+
     public final String classId;
 
     public final boolean hudEnabled;
@@ -28,24 +28,22 @@ public final class S2C_ProfileData {
     public final int xpIntoLevel;
     public final int xpNeededThisLevel;
 
-    // NEW: выбранные перки по тирам: tier -> "namespace:perk"
     public final Map<Integer, String> chosenPerkByTier;
 
-    public S2C_ProfileData(
-            int level,
-            int maxLevel,
-            int xp,
-            int xpToNext,
-            int tokensTotal,
-            int tokensSpent,
-            int tokensAvailable,
-            String classId,
-            boolean hudEnabled,
-            boolean hideVanillaHud,
-            int xpIntoLevel,
-            int xpNeededThisLevel,
-            Map<Integer, String> chosenPerkByTier
-    ) {
+    public S2C_ProfileData(int level,
+                           int maxLevel,
+                           int xp,
+                           int xpToNext,
+                           int tokensTotal,
+                           int tokensSpent,
+                           int tokensAvailable,
+                           long balance,
+                           String classId,
+                           boolean hudEnabled,
+                           boolean hideVanillaHud,
+                           int xpIntoLevel,
+                           int xpNeededThisLevel,
+                           Map<Integer, String> chosenPerkByTier) {
         this.level = level;
         this.maxLevel = maxLevel;
         this.xp = xp;
@@ -55,6 +53,8 @@ public final class S2C_ProfileData {
         this.tokensSpent = tokensSpent;
         this.tokensAvailable = tokensAvailable;
 
+        this.balance = Math.max(0L, balance);
+
         this.classId = classId == null ? "" : classId;
 
         this.hudEnabled = hudEnabled;
@@ -63,7 +63,7 @@ public final class S2C_ProfileData {
         this.xpIntoLevel = xpIntoLevel;
         this.xpNeededThisLevel = xpNeededThisLevel;
 
-        this.chosenPerkByTier = chosenPerkByTier == null ? Map.of() : Map.copyOf(chosenPerkByTier);
+        this.chosenPerkByTier = (chosenPerkByTier == null) ? Map.of() : Map.copyOf(chosenPerkByTier);
     }
 
     public static void encode(S2C_ProfileData msg, FriendlyByteBuf buf) {
@@ -76,6 +76,8 @@ public final class S2C_ProfileData {
         buf.writeInt(msg.tokensSpent);
         buf.writeInt(msg.tokensAvailable);
 
+        buf.writeLong(msg.balance);
+
         buf.writeUtf(msg.classId);
 
         buf.writeBoolean(msg.hudEnabled);
@@ -84,12 +86,10 @@ public final class S2C_ProfileData {
         buf.writeInt(msg.xpIntoLevel);
         buf.writeInt(msg.xpNeededThisLevel);
 
-        // NEW: chosenPerkByTier
-        Map<Integer, String> map = msg.chosenPerkByTier;
-        buf.writeVarInt(map.size());
-        for (var e : map.entrySet()) {
-            buf.writeVarInt(e.getKey());
-            buf.writeUtf(e.getValue() == null ? "" : e.getValue());
+        buf.writeInt(msg.chosenPerkByTier.size());
+        for (var e : msg.chosenPerkByTier.entrySet()) {
+            buf.writeInt(e.getKey());
+            buf.writeUtf(e.getValue());
         }
     }
 
@@ -103,6 +103,8 @@ public final class S2C_ProfileData {
         int tokensSpent = buf.readInt();
         int tokensAvailable = buf.readInt();
 
+        long balance = buf.readLong();
+
         String classId = buf.readUtf(32767);
 
         boolean hudEnabled = buf.readBoolean();
@@ -111,36 +113,38 @@ public final class S2C_ProfileData {
         int xpIntoLevel = buf.readInt();
         int xpNeededThisLevel = buf.readInt();
 
-        // NEW: chosenPerkByTier
-        int size = buf.readVarInt();
-        Map<Integer, String> chosen = new HashMap<>();
+        int size = buf.readInt();
+        Map<Integer, String> chosenByTier = new HashMap<>();
         for (int i = 0; i < size; i++) {
-            int tier = buf.readVarInt();
+            int tier = buf.readInt();
             String perkId = buf.readUtf(32767);
-            if (tier > 0 && perkId != null && !perkId.isBlank()) {
-                chosen.put(tier, perkId);
-            }
+            chosenByTier.put(tier, perkId);
         }
 
         return new S2C_ProfileData(
-                level, maxLevel, xp, xpToNext,
-                tokensTotal, tokensSpent, tokensAvailable,
+                level,
+                maxLevel,
+                xp,
+                xpToNext,
+                tokensTotal,
+                tokensSpent,
+                tokensAvailable,
+                balance,
                 classId,
-                hudEnabled, hideVanillaHud,
-                xpIntoLevel, xpNeededThisLevel,
-                chosen
+                hudEnabled,
+                hideVanillaHud,
+                xpIntoLevel,
+                xpNeededThisLevel,
+                chosenByTier
         );
     }
 
     public static void handle(S2C_ProfileData msg, Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.
-                Context ctx = ctxSupplier.get();
+        NetworkEvent.Context ctx = ctxSupplier.get();
         ctx.enqueueWork(() -> {
-            // на клиенте обновляем кэш
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null) return;
             ClientProfileCache.set(msg);
-
-            // если вдруг GUI открыт — можно триггерить перерисовку не нужно, сам экран прочитает кэш
-            Minecraft.getInstance();
         });
         ctx.setPacketHandled(true);
     }

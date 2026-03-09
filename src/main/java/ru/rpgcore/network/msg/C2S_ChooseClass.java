@@ -22,7 +22,7 @@ import java.util.function.Supplier;
 
 public final class C2S_ChooseClass {
 
-    public final String classId; // "modid:class"
+    public final String classId;
 
     public C2S_ChooseClass(String classId) {
         this.classId = classId == null ? "" : classId;
@@ -45,7 +45,6 @@ public final class C2S_ChooseClass {
 
             RpgProfile p = RpgLevelingService.syncLevel(player);
 
-            // choose once
             if (p.hasClass()) {
                 RpgNetwork.CHANNEL.send(
                         PacketDistributor.PLAYER.with(() -> player),
@@ -88,7 +87,6 @@ public final class C2S_ChooseClass {
 
             sendProfile(player, p);
 
-            // refresh class list info on client (so GUI disables choose)
             RpgNetwork.CHANNEL.send(
                     PacketDistributor.PLAYER.with(() -> player),
                     new S2C_ClassList(
@@ -111,8 +109,7 @@ public final class C2S_ChooseClass {
         int xpIntoLevel;
         int xpNeededThisLevel;
 
-        if (profile.
-                level() >= maxLevel) {
+        if (profile.level() >= maxLevel) {
             xpToNext = -1;
             xpIntoLevel = 0;
             xpNeededThisLevel = 0;
@@ -132,7 +129,7 @@ public final class C2S_ChooseClass {
         boolean hudEnabled = level.getGameRules().getBoolean(RpgGameRules.RPG_HUD_ENABLED);
         boolean hideVanillaHud = level.getGameRules().getBoolean(RpgGameRules.RPG_HIDE_VANILLA_HUD);
 
-        String classId = (profile.hasClass() ? profile.classId() : "");
+        String classId = profile.hasClass() ? profile.classId() : "";
         Map<Integer, String> chosenByTier = profile.chosenPerksByTier();
 
         RpgNetwork.CHANNEL.send(
@@ -145,6 +142,7 @@ public final class C2S_ChooseClass {
                         tokensTotal,
                         tokensSpent,
                         tokensAvailable,
+                        profile.balance(),
                         classId,
                         hudEnabled,
                         hideVanillaHud,

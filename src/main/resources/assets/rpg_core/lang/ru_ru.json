@@ -129,5 +129,6 @@
   "rpg_core.debug.class.duelist.name": "Дуэлянт",
   "rpg_core.debug.class.duelist.desc": "Точный боец с защитными приёмами.",
   "rpg_core.debug.class.duelist.stat1": "+5% скорость атаки (позже)",
-  "rpg_core.debug.class.duelist.stat2": "+5% окно парирования (позже)"
+  "rpg_core.debug.class.duelist.stat2": "+5% окно парирования (позже)",
+  "rpg_core.perks.status.next_tier": "Следующий тир: %s (ур. %s)"
 }

@@ -50,7 +50,6 @@ public final class C2S_ChoosePerk {
         ctx.enqueueWork(() -> {
             if (player == null) return;
 
-            // sync & load profile
             RpgProfile profile = RpgLevelingService.syncLevel(player);
 
             // tier must be explicit
@@ -59,50 +58,76 @@ public final class C2S_ChoosePerk {
                 return;
             }
 
-            // must be allowed by level/tokens
-            int maxTierAllowed = profile.totalPerkTokensGranted();
-            if (msg.tier > maxTierAllowed) {
+            // validate perk id
+            ResourceLocation perkId = ResourceLocation.tryParse(msg.perkId);
+            if (perkId == null || RpgPerkRegistries.registry().getValue(perkId) == null) {
+                RpgNetwork.CHANNEL.send(
+                        PacketDistributor.PLAYER.with(() -> player),
+                        S2C_ActionMessage.error("rpg_core.perks.choose.invalid", msg.perkId)
+                );
                 sendProfile(player, profile);
                 return;
             }
 
-            // deny if tier already chosen
+            // player must have enough level for that tier
+            int maxTierByLevel = profile.level() / 5;
+            if (msg.tier > maxTierByLevel) {
+                RpgNetwork.CHANNEL.send(
+                        PacketDistributor.PLAYER.with(() -> player),
+                        S2C_ActionMessage.error("rpg_core.perks.offers.none_level", Integer.toString(msg.tier * 5))
+                );
+                sendProfile(player, profile);
+                return;
+            }
+
+            // player must have a free token
+            if (profile.perkTokensAvailable() <= 0) {
+                RpgNetwork.CHANNEL.send(
+                        PacketDistributor.PLAYER.with(() -> player),
+                        S2C_ActionMessage.error("rpg_core.perks.choose.not_enough_tokens", "")
+                );
+                sendProfile(player, profile);
+                return;
+            }
+
+            // tier already chosen
             if (profile.hasChosenTier(msg.tier)) {
+                RpgNetwork.CHANNEL.send(
+                        PacketDistributor.PLAYER.with(() -> player),
+                        S2C_ActionMessage.error("rpg_core.perks.choose.already", Integer.toString(msg.tier))
+                );
                 sendProfile(player, profile);
                 return;
             }
 
-            ResourceLocation rl = ResourceLocation.tryParse(msg.perkId);
-            if (rl == null) {
-                sendProfile(player, profile);
-                return;
-            }
-
-            // perk must exist
-            var reg = RpgPerkRegistries.registry();
-            var perk = reg.getValue(rl);
-            if (perk == null) {
-                sendProfile(player, profile);
-                return;
-            }
-
-            // validate offered list for THIS tier (addon-safe)
+            // get default offers
             List<ResourceLocation> defaults = RpgPerkOfferLogic.getOffersForTier(msg.tier);
+
+            // let addons override/replace
             RpgPerkOffersEvent evt = new RpgPerkOffersEvent(player, msg.tier, defaults);
-            MinecraftForge.EVENT_BUS.post(evt);
+            MinecraftForge.
+                    EVENT_BUS.post(evt);
 
             List<ResourceLocation> offers = List.copyOf(evt.offersView());
-            if (!offers.contains(rl)) {
+            if (!offers.contains(perkId)) {
+                RpgNetwork.CHANNEL.send(
+                        PacketDistributor.PLAYER.with(() -> player),
+                        S2C_ActionMessage.error("rpg_core.perks.choose.not_offered", "")
+                );
                 sendProfile(player, profile);
                 return;
             }
 
-            // apply choice
-            profile.setChosenPerkForTier(msg.tier, rl.toString());
-            profile.addPerk(rl.toString()); // convenience list
+            // apply perk choice
+            profile.addPerk(perkId.toString());
+            profile.setChosenPerkForTier(msg.tier, perkId.toString());
             profile.spendPerkTokens(1);
-
             RpgProfileStorage.save(player, profile);
+
+            RpgNetwork.CHANNEL.send(
+                    PacketDistributor.PLAYER.with(() -> player),
+                    S2C_ActionMessage.ok("rpg_core.perks.choose.done", perkId.toString())
+            );
 
             sendProfile(player, profile);
         });
@@ -115,13 +140,11 @@ public final class C2S_ChoosePerk {
         RpgWorldConfigData cfg = RpgWorldConfigData.get(level);
         int maxLevel = cfg.getMaxLevel();
 
-        // XP breakdown
         int xpToNext;
         int xpIntoLevel;
         int xpNeededThisLevel;
 
-        if (profile.
-                level() >= maxLevel) {
+        if (profile.level() >= maxLevel) {
             xpToNext = -1;
             xpIntoLevel = 0;
             xpNeededThisLevel = 0;
@@ -134,19 +157,14 @@ public final class C2S_ChoosePerk {
             xpToNext = Math.max(0, totalForNext - profile.xp());
         }
 
-        // Tokens
         int tokensTotal = profile.totalPerkTokensGranted();
         int tokensSpent = profile.perkTokensSpent();
         int tokensAvailable = profile.perkTokensAvailable();
 
-        // HUD flags
         boolean hudEnabled = level.getGameRules().getBoolean(RpgGameRules.RPG_HUD_ENABLED);
         boolean hideVanillaHud = level.getGameRules().getBoolean(RpgGameRules.RPG_HIDE_VANILLA_HUD);
 
-        // Class
-        String classId = (profile.hasClass() ? profile.classId() : "");
-
-        // Tier picks (tier -> perkId)
+        String classId = profile.hasClass() ? profile.classId() : "";
         Map<Integer, String> chosenByTier = profile.chosenPerksByTier();
 
         RpgNetwork.CHANNEL.send(
@@ -159,6 +177,7 @@ public final class C2S_ChoosePerk {
                         tokensTotal,
                         tokensSpent,
                         tokensAvailable,
+                        profile.balance(),
                         classId,
                         hudEnabled,
                         hideVanillaHud,

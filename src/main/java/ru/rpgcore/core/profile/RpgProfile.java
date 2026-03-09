@@ -8,6 +8,9 @@ public final class RpgProfile {
     private int level;
     private int xp; // total XP
 
+    // Currency / wallet
+    private long balance;
+
     // Class (stored as string "modid:class", null = not chosen)
     private String classId;
 
@@ -19,20 +22,33 @@ public final class RpgProfile {
     // key = tier (>=1), value = perkId string ("modid:perk")
     private final Map<Integer, String> chosenPerkByTier;
 
-    /** Backward compatible constructor (old saves). */
+    /** Backward compatible constructor (very old saves). */
     public RpgProfile(int level, int xp, int perkTokensSpent, List<String> chosenPerks) {
-        this(level, xp, null, perkTokensSpent, chosenPerks, null);
+        this(level, xp, 0L, null, perkTokensSpent, chosenPerks, null);
     }
 
-    /** Full constructor (used by storage). */
+    /** Backward compatible constructor (older saves with class, but without wallet). */
     public RpgProfile(int level,
                       int xp,
                       String classId,
                       int perkTokensSpent,
                       List<String> chosenPerks,
                       Map<Integer, String> chosenPerkByTier) {
-        this.level = level;
-        this.xp = xp;
+        this(level, xp, 0L, classId, perkTokensSpent, chosenPerks, chosenPerkByTier);
+    }
+
+    /** Full constructor (used by storage). */
+    public RpgProfile(int level,
+                      int xp,
+                      long balance,
+                      String classId,
+                      int perkTokensSpent,
+                      List<String> chosenPerks,
+                      Map<Integer, String> chosenPerkByTier) {
+        this.level = Math.max(0, level);
+        this.xp = Math.max(0, xp);
+
+        this.balance = Math.max(0L, balance);
 
         this.classId = normalizeIdOrNull(classId);
 
@@ -57,25 +73,82 @@ public final class RpgProfile {
         if (id == null) return null;
         id = id.trim();
         if (id.isEmpty()) return null;
-        // validate ResourceLocation format
         ResourceLocation rl = ResourceLocation.tryParse(id);
         return (rl == null) ? null : rl.toString();
     }
 
     /* ===== Level / XP ===== */
-    public int level() { return level; }
-    public int xp() { return xp; }
-    public void setLevel(int level) { this.level = level; }
-    public void setXp(int xp) { this.xp = xp; }
+
+    public int level() {
+        return level;
+    }
+
+    public int xp() {
+        return xp;
+    }
+
+    public void setLevel(int level) {
+        this.level = Math.max(0, level);
+    }
+
+    public void setXp(int xp) {
+        this.xp = Math.max(0, xp);
+    }
+
+    /* ===== Currency / Wallet ===== */
+
+    public long balance() {
+        return balance;
+    }
+
+    public void setBalance(long balance) {
+        this.balance = Math.max(0L, balance);
+    }
+
+    public boolean canAfford(long amount) {
+        return amount >= 0L && balance >= amount;
+    }
+
+    public void addBalance(long amount) {
+        if (amount <= 0L) return;
+
+        long next;
+        if (Long.MAX_VALUE - balance < amount) next = Long.MAX_VALUE;
+        else next = balance + amount;
+
+        this.balance = Math.max(0L, next);
+    }
+
+    /**
+     * Removes up to the requested amount.
+     * @return true if the full amount was removed, false if not enough balance
+     */
+    public boolean removeBalance(long amount) {
+        if (amount < 0L) return false;
+        if (amount == 0L) return true;
+        if (!canAfford(amount)) return false;
+
+        this.balance -= amount;
+        if (this.balance < 0L) this.balance = 0L;
+        return true;
+    }
+    public void clearBalance() {
+        this.balance = 0L;
+    }
 
     /* ===== Class ===== */
-    public String classId() { return classId; }
+
+    public String classId() {
+        return classId;
+    }
 
     public ResourceLocation classIdAsRL() {
         return classId == null ? null : ResourceLocation.tryParse(classId);
     }
 
-    public boolean hasClass() { return classId != null; }
+    public boolean hasClass() {
+        return classId != null;
+    }
 
     public void setClassId(String classId) {
         this.classId = normalizeIdOrNull(classId);
@@ -99,7 +172,9 @@ public final class RpgProfile {
     }
 
     /** How many tokens have been spent. */
-    public int perkTokensSpent() { return perkTokensSpent; }
+    public int perkTokensSpent() {
+        return perkTokensSpent;
+    }
 
     /** Increase spent tokens by N (used when choosing perks). */
     public void spendPerkTokens(int amount) {

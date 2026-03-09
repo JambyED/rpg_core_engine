@@ -129,5 +129,6 @@
   "rpg_core.debug.class.duelist.name": "Duelist",
   "rpg_core.debug.class.duelist.desc": "Precise fighter with defensive tricks.",
   "rpg_core.debug.class.duelist.stat1": "+5% Attack Speed (later)",
-  "rpg_core.debug.class.duelist.stat2": "+5% Parry Window (later)"
+  "rpg_core.debug.class.duelist.stat2": "+5% Parry Window (later)",
+  "rpg_core.perks.status.next_tier": "Next tier: %s (lvl %s)"
 }

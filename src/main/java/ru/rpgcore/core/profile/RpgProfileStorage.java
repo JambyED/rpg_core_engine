@@ -17,6 +17,9 @@ public final class RpgProfileStorage {
     private static final String KEY_LEVEL = "level";
     private static final String KEY_XP = "xp";
 
+    // Currency / wallet
+    private static final String KEY_BALANCE = "balance";
+
     // Class
     private static final String KEY_CLASS_ID = "classId"; // String "modid:class"
 
@@ -33,6 +36,14 @@ public final class RpgProfileStorage {
 
         int level = root.contains(KEY_LEVEL, Tag.TAG_INT) ? root.getInt(KEY_LEVEL) : 0;
         int xp = root.contains(KEY_XP, Tag.TAG_INT) ? root.getInt(KEY_XP) : 0;
+
+        long balance = 0L;
+        if (root.contains(KEY_BALANCE, Tag.TAG_LONG)) {
+            balance = Math.max(0L, root.getLong(KEY_BALANCE));
+        } else if (root.contains(KEY_BALANCE, Tag.TAG_INT)) {
+            // Safety for any temporary/older int-based experiments
+            balance = Math.max(0L, root.getInt(KEY_BALANCE));
+        }
 
         String classId = root.contains(KEY_CLASS_ID, Tag.TAG_STRING) ? root.getString(KEY_CLASS_ID) : null;
 
@@ -60,11 +71,12 @@ public final class RpgProfileStorage {
                     if (perkId != null && !perkId.isBlank()) {
                         byTier.put(tier, perkId);
                     }
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
 
-        return new RpgProfile(level, xp, classId, spent, perks, byTier);
+        return new RpgProfile(level, xp, balance, classId, spent, perks, byTier);
     }
 
     public static void save(ServerPlayer player, RpgProfile profile) {
@@ -73,6 +85,9 @@ public final class RpgProfileStorage {
 
         root.putInt(KEY_LEVEL, profile.level());
         root.putInt(KEY_XP, profile.xp());
+
+        // balance / wallet
+        root.putLong(KEY_BALANCE, Math.max(0L, profile.balance()));
 
         // classId
         if (profile.classId() != null) root.putString(KEY_CLASS_ID, profile.classId());
@@ -89,7 +104,8 @@ public final class RpgProfileStorage {
 
         // chosenPerksByTier compound
         CompoundTag tiers = new CompoundTag();
-        for (var e : profile.chosenPerksByTier().entrySet()) {
+        for (var e : profile.
+                chosenPerksByTier().entrySet()) {
             Integer tier = e.getKey();
             String perkId = e.getValue();
             if (tier == null || tier < 1) continue;
@@ -102,6 +118,6 @@ public final class RpgProfileStorage {
     }
 
     public static void reset(ServerPlayer player) {
-        save(player, new RpgProfile(0, 0, null, 0, List.of(), Map.of()));
+        save(player, new RpgProfile(0, 0, 0L, null, 0, List.of(), Map.of()));
     }
 }

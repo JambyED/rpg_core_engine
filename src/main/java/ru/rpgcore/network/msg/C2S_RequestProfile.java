@@ -17,10 +17,7 @@ import java.util.function.Supplier;
 
 public final class C2S_RequestProfile {
 
-    public C2S_RequestProfile() {}
-
     public static void encode(C2S_RequestProfile msg, FriendlyByteBuf buf) {
-        // no fields
     }
 
     public static C2S_RequestProfile decode(FriendlyByteBuf buf) {
@@ -34,56 +31,50 @@ public final class C2S_RequestProfile {
         ctx.enqueueWork(() -> {
             if (player == null) return;
 
-            // sync & load profile
-            RpgProfile p = RpgLevelingService.syncLevel(player);
+            RpgProfile profile = RpgLevelingService.syncLevel(player);
 
             ServerLevel level = player.serverLevel();
             RpgWorldConfigData cfg = RpgWorldConfigData.get(level);
             int maxLevel = cfg.getMaxLevel();
 
-            // XP breakdown
             int xpToNext;
             int xpIntoLevel;
             int xpNeededThisLevel;
 
-            if (p.level() >= maxLevel) {
+            if (profile.level() >= maxLevel) {
                 xpToNext = -1;
                 xpIntoLevel = 0;
                 xpNeededThisLevel = 0;
             } else {
-                int totalForThis = RpgXpCurve.totalXpForLevel(p.level(), cfg);
-                int totalForNext = RpgXpCurve.totalXpForLevel(p.level() + 1, cfg);
+                int totalForThis = RpgXpCurve.totalXpForLevel(profile.level(), cfg);
+                int totalForNext = RpgXpCurve.totalXpForLevel(profile.level() + 1, cfg);
 
-                xpIntoLevel = Math.max(0, p.xp() - totalForThis);
+                xpIntoLevel = Math.max(0, profile.xp() - totalForThis);
                 xpNeededThisLevel = Math.max(1, totalForNext - totalForThis);
-                xpToNext = Math.max(0, totalForNext - p.xp());
+                xpToNext = Math.max(0, totalForNext - profile.xp());
             }
 
-            // Tokens
-            int tokensTotal = p.totalPerkTokensGranted();
-            int tokensSpent = p.perkTokensSpent();
-            int tokensAvailable = p.perkTokensAvailable();
+            int tokensTotal = profile.totalPerkTokensGranted();
+            int tokensSpent = profile.perkTokensSpent();
+            int tokensAvailable = profile.perkTokensAvailable();
 
-            // HUD flags
             boolean hudEnabled = level.getGameRules().getBoolean(RpgGameRules.RPG_HUD_ENABLED);
             boolean hideVanillaHud = level.getGameRules().getBoolean(RpgGameRules.RPG_HIDE_VANILLA_HUD);
 
-            // Class
-            String classId = (p.hasClass() ? p.classId() : "");
-
-            // Tier picks (tier -> perkId)
-            Map<Integer, String> chosenByTier = p.chosenPerksByTier();
+            String classId = profile.hasClass() ? profile.classId() : "";
+            Map<Integer, String> chosenByTier = profile.chosenPerksByTier();
 
             RpgNetwork.CHANNEL.send(
                     PacketDistributor.PLAYER.with(() -> player),
                     new S2C_ProfileData(
-                            p.level(),
+                            profile.level(),
                             maxLevel,
-                            p.xp(),
+                            profile.xp(),
                             xpToNext,
                             tokensTotal,
                             tokensSpent,
                             tokensAvailable,
+                            profile.balance(),
                             classId,
                             hudEnabled,
                             hideVanillaHud,

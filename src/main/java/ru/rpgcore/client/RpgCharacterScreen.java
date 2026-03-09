@@ -19,8 +19,11 @@ import java.util.List;
 
 public final class RpgCharacterScreen extends Screen {
 
-    private static final int PANEL_W = 410;
-    private static final int PANEL_H = 245;
+    private static final int PANEL_W = 432;
+    private static final int PANEL_H = 300;
+
+    private static final int LEFT_SECTION_W = 118;
+    private static final int GAP = 10;
 
     public RpgCharacterScreen() {
         super(Component.translatable("rpg_core.gui.profile.title"));
@@ -36,7 +39,7 @@ public final class RpgCharacterScreen extends Screen {
         }
 
         int centerX = this.width / 2;
-        int bottomY = this.height / 2 + PANEL_H / 2 - 24;
+        int bottomY = this.height / 2 + PANEL_H / 2 + 16;
 
         addRenderableWidget(Button.builder(
                 Component.translatable("rpg_core.gui.menu.class"),
@@ -67,8 +70,7 @@ public final class RpgCharacterScreen extends Screen {
         int right = left + PANEL_W;
         int bottom = top + PANEL_H;
 
-        drawPanel(gfx, left, top, right, bottom);
-
+        drawMainPanel(gfx, left, top, right, bottom);
         gfx.drawCenteredString(this.font, this.title, cx, top + 8, 0xFFFFFF);
 
         S2C_ProfileData d = ClientProfileCache.get();
@@ -83,100 +85,43 @@ public final class RpgCharacterScreen extends Screen {
             return;
         }
 
-        int modelCenterX = left + 68;
-        int modelBottomY = top + 145;
-        int modelScale = 52;
+        int leftSectionX = left + 12;
+        int leftSectionY = top + 24;
+        int leftSectionRight = leftSectionX + LEFT_SECTION_W;
+        int leftSectionBottom = top + PANEL_H - 16;
 
-        drawPlayerModel(gfx, modelCenterX, modelBottomY, modelScale);
+        int rightSectionX = leftSectionRight + GAP;
+        int rightSectionY = top + 24;
+        int rightSectionRight = right - 12;
+        int rightSectionW = rightSectionRight - rightSectionX;
 
-        int infoX = left + 135;
-        int infoY = top + 26;
-        int infoW = right - infoX - 16;
+        int profileTop = rightSectionY;
+        int profileBottom = profileTop + 88;
 
-        String playerName = Minecraft.getInstance().player != null
-                ? Minecraft.getInstance().player.getGameProfile().getName()
-                : "?";
+        int classTop = profileBottom + 8;
+        int classBottom = classTop + 70;
 
-        gfx.drawString(
-                this.font,
-                Component.translatable("rpg_core.profile.player", playerName),
-                infoX,
-                infoY,
-                0xFFFFFF,
-                false
-        );
-        infoY += 15;
+        int tokensTop = classBottom + 8;
+        int tokensBottom = tokensTop + 34;
 
-        gfx.drawString(
-                this.font,
-                Component.translatable("rpg_core.gui.profile.level", d.level, d.maxLevel),
-                infoX,
-                infoY,
-                0xE0E0E0,
-                false
-        );
-        infoY += 15;
+        int walletTop = tokensBottom + 8;
+        int walletBottom = walletTop + 30;
 
-        int barW = Math.min(175, infoW - 16);
-        int barH = 8;
-        drawXpBar(gfx, infoX, infoY, barW, barH, d);
-        gfx.drawString(this.font, String.valueOf(d.
-                level), infoX + barW + 10, infoY - 1, 0x55FFFF, false);
-        infoY += 17;
+        drawSubPanel(gfx, leftSectionX, leftSectionY, leftSectionRight, leftSectionBottom);
+        drawSubPanel(gfx, rightSectionX, profileTop, rightSectionRight, profileBottom);
+        drawSubPanel(gfx, rightSectionX, classTop, rightSectionRight, classBottom);
+        drawSubPanel(gfx, rightSectionX, tokensTop, rightSectionRight, tokensBottom);
+        drawSubPanel(gfx, rightSectionX, walletTop, rightSectionRight, walletBottom);
 
-        if (d.xpToNext < 0) {
-            gfx.drawString(
-                    this.font,
-                    Component.translatable("rpg_core.gui.profile.xp_to_next_max"),
-                    infoX,
-                    infoY,
-                    0xAAAAAA,
-                    false
-            );
-        } else {
-            gfx.drawString(
-                    this.font,
-                    Component.translatable("rpg_core.gui.profile.xp_to_next", d.xpToNext),
-                    infoX,
-                    infoY,
-                    0xAAAAAA,
-                    false
-            );
-        }
-        infoY += 12;
+        drawLeftSection(gfx, leftSectionX, leftSectionY, leftSectionRight, leftSectionBottom);
 
-        gfx.drawString(
-                this.font,
-                Component.translatable("rpg_core.gui.profile.total_xp", d.xp),
-                infoX,
-                infoY,
-                0xAAAAAA,
-                false
-        );
-        infoY += 18;
-
-        int classBlockHeight = drawClassBlock(gfx, d, infoX, infoY, infoW);
-        infoY += classBlockHeight + 14;
-
-        gfx.drawString(
-                this.font,
-                Component.translatable(
-                        "rpg_core.gui.profile.tokens",
-                        d.tokensTotal,
-                        d.tokensSpent,
-                        d.tokensAvailable
-                ),
-                infoX,
-                infoY,
-                0x55FF55,
-                false
-        );
-
-        infoY += 18;
-        drawWalletBlock(gfx, infoX, infoY);
+        drawProfileBlock(gfx, d, rightSectionX + 12, profileTop + 10, rightSectionW - 24);
+        drawClassBlock(gfx, d, rightSectionX + 12, classTop + 10, rightSectionW - 24);
+        drawTokensBlock(gfx, d, rightSectionX + 12, tokensTop + 10, rightSectionW - 24);
+        drawWalletBlock(gfx, d, rightSectionX + 12, walletTop + 8, rightSectionW - 24);
     }
 
-    private void drawPanel(GuiGraphics gfx, int left, int top, int right, int bottom) {
+    private void drawMainPanel(GuiGraphics gfx, int left, int top, int right, int bottom) {
         int outer = 0xAA111111;
         int inner = 0xAA2A2A2A;
         int bg = 0x88000000;
@@ -186,20 +131,189 @@ public final class RpgCharacterScreen extends Screen {
         gfx.fill(left, top, right, bottom, bg);
     }
 
-    private void drawPlayerModel(GuiGraphics gfx, int centerX, int bottomY, int scale) {
+    private void drawSubPanel(GuiGraphics gfx, int left, int top, int right, int bottom) {
+        int outer = 0x66303030;
+        int inner = 0x55202020;
+        int bg = 0x44000000;
+
+        gfx.fill(left - 1, top - 1, right + 1, bottom + 1, outer);
+        gfx.fill(left, top, right, bottom, inner);
+        gfx.fill(left + 1, top + 1, right - 1, bottom - 1, bg);
+    }
+
+    private void drawLeftSection(GuiGraphics gfx, int left, int top, int right, int bottom) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
-            return;
-        }
+        if (mc.player == null) return;
+
+        int centerX = (left + right) / 2;
+        int modelBottomY = top + 118;
+        int modelScale = 58;
 
         InventoryScreen.renderEntityInInventoryFollowsAngle(
                 gfx,
                 centerX,
-                bottomY,
-                scale,
+                modelBottomY,
+                modelScale,
                 0.0F,
                 0.0F,
                 mc.player
+        );
+    }
+
+    private void drawProfileBlock(GuiGraphics gfx, S2C_ProfileData d, int x, int y, int w) {
+        String playerName = Minecraft.getInstance().player != null
+                ? Minecraft.getInstance().player.getGameProfile().getName()
+                : "?";
+
+        gfx.drawString(
+                this.font,
+                Component.translatable("rpg_core.profile.player", playerName),
+                x,
+                y,
+                0xFFFFFF,
+                false
+        );
+        y += 14;
+
+        gfx.drawString(
+                this.font,
+                Component.translatable("rpg_core.gui.profile.level", d.level, d.maxLevel),
+                x,
+                y,
+                0xE0E0E0,
+                false
+        );
+        y += 14;
+
+        int barW = Math.min(180, w - 34);
+        int barH = 8;
+        drawXpBar(gfx, x, y, barW, barH, d);
+        gfx.drawString(this.font, String.valueOf(d.level), x + barW + 8, y - 1, 0x55FFFF, false);
+        y += 16;
+
+        if (d.xpToNext < 0) {
+            gfx.drawString(
+                    this.font,
+                    Component.translatable("rpg_core.gui.profile.xp_to_next_max"),
+                    x,
+                    y,
+                    0xAAAAAA,
+                    false
+            );
+        } else {
+            gfx.drawString(
+                    this.font,
+                    Component.translatable("rpg_core.gui.profile.xp_to_next", d.xpToNext),
+                    x,
+                    y,
+                    0xAAAAAA,
+                    false
+            );
+        }
+        y += 12;
+
+        gfx.drawString(
+                this.font,
+                Component.translatable("rpg_core.gui.profile.total_xp", d.xp),
+                x,
+                y,
+                0xAAAAAA,
+                false
+        );
+    }
+
+    private void drawClassBlock(GuiGraphics gfx, S2C_ProfileData d, int x, int y, int w) {
+        if (d.classId == null || d.classId.isBlank()) {
+            gfx.drawString(
+                    this.font,
+                    Component.translatable("rpg_core.gui.profile.class_none"),
+                    x,
+                    y,
+                    0xFF5555,
+                    false
+            );
+            return;
+        }
+
+        ResourceLocation rl = ResourceLocation.tryParse(d.classId);
+        if (rl == null) {
+            gfx.drawString(this.font, Component.literal(d.classId), x, y, 0xFF5555, false);
+            return;
+        }
+
+        RpgClass clazz = RpgClassRegistries.registry().getValue(rl);
+        if (clazz == null) {
+            gfx.drawString(this.font, Component.literal(d.classId), x, y, 0xFF5555, false);
+            return;
+        }
+
+        int iconSize = 18;
+
+        if (clazz.iconTexture() != null) {
+            gfx.blit(clazz.iconTexture(), x, y + 1, 0, 0, iconSize, iconSize, iconSize, iconSize);
+        } else {
+            gfx.fill(x, y + 1, x + iconSize, y + 1 + iconSize, 0xFF222222);
+        }
+
+        gfx.drawString(
+                this.font,
+                Component.translatable("rpg_core.gui.profile.class", clazz.displayName()),
+                x + iconSize + 8,
+                y,
+                0x55FFFF,
+                false
+        );
+
+        int textY = y + 14;
+        int textW = w - iconSize - 8;
+
+        List<FormattedCharSequence> descLines = this.font.split(clazz.description(), textW);
+        if (!descLines.isEmpty()) {
+            gfx.drawString(this.font, descLines.get(0), x + iconSize + 8, textY, 0xAAAAAA, false);
+            textY += 10;
+        }
+
+        List<Component> stats = clazz.statsLines();
+        if (stats.size() > 0) {
+            gfx.drawString(this.font, stats.get(0), x + iconSize + 8, textY, 0x55FF55, false);
+            textY += 10;
+        }
+        if (stats.size() > 1) {
+            gfx.drawString(this.font, stats.get(1), x + iconSize + 8, textY, 0x55FF55, false);
+        }
+    }
+
+    private void drawTokensBlock(GuiGraphics gfx, S2C_ProfileData d, int x, int y, int w) {
+        gfx.drawString(
+                this.font,
+                Component.translatable(
+                        "rpg_core.gui.profile.tokens",
+                        d.tokensTotal,
+                        d.tokensSpent,
+                        d.tokensAvailable
+                ),
+                x,
+                y,
+                0x55FF55,
+                false
+        );
+    }
+
+    private void drawWalletBlock(GuiGraphics gfx, S2C_ProfileData d, int x, int y, int w) {
+        int coinX = x;
+        int coinY = y + 1;
+
+        gfx.fill(coinX, coinY, coinX + 10, coinY + 10, 0xFF6B4E00);
+        gfx.fill(coinX + 1, coinY + 1, coinX + 9, coinY + 9, 0xFFFFD54A);
+        gfx.fill(coinX + 3, coinY + 3, coinX + 7, coinY + 7, 0xFFFFEE88);
+
+        gfx.drawString(
+                this.font,
+                Component.translatable("rpg_core.gui.profile.wallet", Long.toString(d.balance)),
+                x + 16,
+                y,
+                0xFFD54A,
+                false
         );
     }
 
@@ -223,86 +337,6 @@ public final class RpgCharacterScreen extends Screen {
         if (filled > 0) {
             gfx.fill(x + 1, y + 1, x + 1 + filled, y + h - 1, 0xFF2563EB);
         }
-    }
-
-    private int drawClassBlock(GuiGraphics gfx, S2C_ProfileData d, int x, int y, int w) {
-        if (d.classId == null || d.classId.isBlank()) {
-            gfx.drawString(
-                    this.font,
-                    Component.translatable("rpg_core.gui.profile.class_none"),
-                    x,
-                    y,
-                    0xFF5555,
-                    false
-            );
-            return 12;
-        }
-
-        ResourceLocation rl = ResourceLocation.tryParse(d.classId);
-        if (rl == null) {
-            gfx.drawString(this.font, Component.literal(d.classId), x, y, 0xFF5555, false);
-            return 12;
-        }
-
-        RpgClass clazz = RpgClassRegistries.registry().getValue(rl);
-        if (clazz == null) {
-            gfx.drawString(this.font, Component.literal(d.classId), x, y, 0xFF5555, false);
-            return 12;
-        }
-
-        int iconSize = 18;
-        gfx.fill(x, y + 1, x + iconSize, y + 1 + iconSize, 0xFF222222);
-
-        gfx.drawString(
-                this.font,
-                Component.translatable("rpg_core.gui.profile.class", clazz.displayName()),
-                x + iconSize + 8,
-                y,
-                0x55FFFF,
-                false
-        );
-
-        int textY = y + 14;
-        int textW = w - iconSize - 8;
-        int startY = y;
-
-        List<FormattedCharSequence> descLines = this.font.split(clazz.description(), textW);
-        int maxDescLines = Math.min(2, descLines.size());
-        for (int i = 0; i < maxDescLines; i++) {
-            gfx.drawString(this.font, descLines.get(i), x + iconSize + 8, textY, 0xAAAAAA, false);
-            textY += 10;
-        }
-
-        List<Component> stats = clazz.statsLines();
-        if (stats.size() > 0) {
-            gfx.drawString(this.font, stats.get(0), x + iconSize + 8, textY, 0x55FF55, false);
-            textY += 10;
-        }
-        if (stats.size() > 1) {
-            gfx.drawString(this.font, stats.get(1), x + iconSize + 8, textY, 0x55FF55, false);
-            textY += 10;
-        }
-
-        return Math.max(24, textY - startY);
-    }
-
-    private void drawWalletBlock(GuiGraphics gfx, int x, int y) {
-        int coinX = x;
-        int coinY = y + 1;
-
-        // простая заглушка-иконка монеты до финального арта
-        gfx.fill(coinX, coinY, coinX + 10, coinY + 10, 0xFF6B4E00);
-        gfx.fill(coinX + 1, coinY + 1, coinX + 9, coinY + 9, 0xFFFFD54A);
-        gfx.fill(coinX + 3, coinY + 3, coinX + 7, coinY + 7, 0xFFFFEE88);
-
-        gfx.drawString(
-                this.font,
-                Component.translatable("rpg_core.gui.profile.wallet", "—"),
-                x + 16,
-                y,
-                0xFFD54A,
-                false
-        );
     }
 
     @Override
