@@ -143,5 +143,10 @@
   "rpg_core.money.pay.self": "You cannot send money to yourself.",
   "rpg_core.money.pay.not_enough": "Not enough money. Required: %s, current balance: %s",
   "rpg_core.money.pay.sent": "You sent %s coins to %s. New balance: %s",
-  "rpg_core.money.pay.received": "You received %s coins from %s. New balance: %s"
+  "rpg_core.money.pay.received": "You received %s coins from %s. New balance: %s",
+  "rpg_core.storage.test.not_found": "Test storage not found.",
+  "rpg_core.storage.test.info": "Storage %s: size=%s, non-empty slots=%s",
+  "rpg_core.storage.test.created": "Test storage created: %s (size=%s)",
+  "rpg_core.storage.test.resized": "Test storage resized: %s (size=%s)",
+  "rpg_core.storage.test.cleared": "Test storage cleared: %s"
 }

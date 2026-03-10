@@ -143,5 +143,10 @@
   "rpg_core.money.pay.self": "Нельзя перевести деньги самому себе.",
   "rpg_core.money.pay.not_enough": "Недостаточно денег. Нужно: %s, текущий баланс: %s",
   "rpg_core.money.pay.sent": "Вы отправили %s монет игроку %s. Новый баланс: %s",
-  "rpg_core.money.pay.received": "Вы получили %s монет от игрока %s. Новый баланс: %s"
+  "rpg_core.money.pay.received": "Вы получили %s монет от игрока %s. Новый баланс: %s",
+  "rpg_core.storage.test.not_found": "Тестовое хранилище не найдено.",
+  "rpg_core.storage.test.info": "Хранилище %s: размер=%s, непустых слотов=%s",
+  "rpg_core.storage.test.created": "Тестовое хранилище создано: %s (размер=%s)",
+  "rpg_core.storage.test.resized": "Тестовое хранилище изменено: %s (размер=%s)",
+  "rpg_core.storage.test.cleared": "Тестовое хранилище очищено: %s"
 }

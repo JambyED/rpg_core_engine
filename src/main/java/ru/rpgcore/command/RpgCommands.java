@@ -28,6 +28,10 @@ import ru.rpgcore.core.perk.RpgPerkOfferLogic;
 import ru.rpgcore.core.perk.RpgPerkRegistries;
 import ru.rpgcore.core.profile.RpgProfile;
 import ru.rpgcore.core.profile.RpgProfileStorage;
+import ru.rpgcore.core.storage.RpgStorage;
+import ru.rpgcore.core.storage.RpgStorageManager;
+import ru.rpgcore.core.storage.RpgStorageOwnerRef;
+import ru.rpgcore.core.storage.RpgStorageOwnerType;
 import ru.rpgcore.core.xp.RpgXpCurve;
 
 import java.util.Comparator;
@@ -47,6 +51,7 @@ public final class RpgCommands {
                         .then(hud())
                         .then(mobXp())
                         .then(money())
+                        .then(storage())
                         .then(perks())
                         .then(rpgClass())
         );
@@ -84,10 +89,7 @@ public final class RpgCommands {
         ServerLevel level = source.getLevel();
         boolean enabled = level.getGameRules().getBoolean(RpgGameRules.RPG_HUD_ENABLED);
 
-        source.sendSuccess(
-                () -> Component.literal("RPG HUD: " + enabled),
-                false
-        );
+        source.sendSuccess(() -> Component.literal("RPG HUD: " + enabled), false);
         return 1;
     }
 
@@ -96,10 +98,10 @@ public final class RpgCommands {
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         return Commands.literal("vanilla")
-                .requires(src -> src.hasPermission(2))
+                .
+                requires(src -> src.hasPermission(2))
                 .then(Commands.literal("on").executes(ctx -> setHideVanillaHud(ctx.getSource(), false)))
-                .then(Commands.literal("off").
-                        executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
+                .then(Commands.literal("off").executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
                 .then(Commands.literal("status").executes(ctx -> hideVanillaHudStatus(ctx.getSource())));
     }
 
@@ -118,10 +120,7 @@ public final class RpgCommands {
         ServerLevel level = source.getLevel();
         boolean hide = level.getGameRules().getBoolean(RpgGameRules.RPG_HIDE_VANILLA_HUD);
 
-        source.sendSuccess(
-                () -> Component.literal("Hide vanilla HUD: " + hide),
-                false
-        );
+        source.sendSuccess(() -> Component.literal("Hide vanilla HUD: " + hide), false);
         return 1;
     }
 
@@ -181,7 +180,8 @@ public final class RpgCommands {
                 .then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> {
                             int count = 0;
-                            for (ServerPlayer p : EntityArgument.getPlayers(ctx, "targets")) {
+                            for (ServerPlayer p : EntityArgument.
+                                    getPlayers(ctx, "targets")) {
                                 RpgLevelingService.reset(p);
                                 count++;
                                 p.sendSystemMessage(Component.translatable("rpg_core.reset.done_admin_to_target"));
@@ -269,8 +269,7 @@ public final class RpgCommands {
                         )
                 )
                 .then(Commands.literal("add")
-                        .
-                        requires(src -> src.hasPermission(2))
+                        .requires(src -> src.hasPermission(2))
                         .then(Commands.argument("targets", EntityArgument.players())
                                 .then(Commands.argument("amount", LongArgumentType.longArg(0L))
                                         .executes(ctx -> moneyAdd(
@@ -357,13 +356,12 @@ public final class RpgCommands {
                 false
         );
 
-        target.sendSystemMessage(Component.
-                translatable(
-                        "rpg_core.money.pay.received",
-                        amount,
-                        sender.getGameProfile().getName(),
-                        targetProfile.balance()
-                ));
+        target.sendSystemMessage(Component.translatable(
+                "rpg_core.money.pay.received",
+                amount,
+                sender.getGameProfile().getName(),
+                targetProfile.balance()
+        ));
 
         return 1;
     }
@@ -438,6 +436,134 @@ public final class RpgCommands {
                 true
         );
         return finalCount;
+    }
+
+    /* =========================
+       /rpg storage test ...
+       ========================= */
+    private static ArgumentBuilder<CommandSourceStack, ?> storage() {
+        return Commands.literal("storage")
+                .then(Commands.literal("test")
+                        .executes(ctx -> storageInfo(ctx.getSource()))
+                        .then(Commands.literal("info")
+                                .executes(ctx -> storageInfo(ctx.getSource()))
+                        )
+                        .then(Commands.literal("create")
+                                .then(Commands.argument("size", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> storageCreate(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "size")
+                                        ))
+                                )
+                        )
+                        .then(Commands.literal("resize")
+                                .then(Commands.argument("size", IntegerArgumentType.integer(1))
+                                        .
+                                        executes(ctx -> storageResize(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "size")
+                                        ))
+                                )
+                        )
+                        .then(Commands.literal("clear")
+                                .executes(ctx -> storageClear(ctx.getSource()))
+                        )
+                );
+    }
+
+    private static RpgStorageOwnerRef testStorageOwner(ServerPlayer player) {
+        return new RpgStorageOwnerRef(
+                RpgStorageOwnerType.PLAYER,
+                player.getUUID().toString() + ":test"
+        );
+    }
+
+    private static int storageInfo(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        RpgStorageOwnerRef owner = testStorageOwner(player);
+        RpgStorage storage = RpgStorageManager.get(player.serverLevel(), owner);
+
+        if (storage == null) {
+            source.sendFailure(Component.translatable("rpg_core.storage.test.not_found"));
+            return 0;
+        }
+
+        int nonEmpty = 0;
+
+        for (int i = 0; i < storage.size(); i++) {
+            if (!storage.getItem(i).isEmpty()) nonEmpty++;
+        }
+
+        final int usedSlots = nonEmpty;
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.test.info",
+                        storage.storageId(),
+                        storage.size(),
+                        usedSlots
+                ),
+                false
+        );
+        return 1;
+    }
+
+    private static int storageCreate(CommandSourceStack source, int size) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        RpgStorageOwnerRef owner = testStorageOwner(player);
+        RpgStorage storage = RpgStorageManager.getOrCreate(player.serverLevel(), owner, size);
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.test.created",
+                        storage.storageId(),
+                        storage.size()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int storageResize(CommandSourceStack source, int size) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        RpgStorageOwnerRef owner = testStorageOwner(player);
+        RpgStorage storage = RpgStorageManager.getOrCreate(player.serverLevel(), owner, size);
+        storage.resize(size);
+        RpgStorageManager.save(player.serverLevel(), storage);
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.test.resized",
+                        storage.storageId(),
+                        storage.size()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int storageClear(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        RpgStorageOwnerRef owner = testStorageOwner(player);
+        RpgStorage storage = RpgStorageManager.get(player.serverLevel(), owner);
+
+        if (storage == null) {
+            source.sendFailure(Component.translatable("rpg_core.storage.test.not_found"));
+            return 0;
+        }
+
+        storage.clearAll();
+        RpgStorageManager.save(player.serverLevel(), storage);
+
+        source.sendSuccess(
+                () -> Component.translatable("rpg_core.storage.test.cleared", storage.storageId()),
+                true
+        );
+        return 1;
     }
 
     /* =========================
@@ -541,8 +667,7 @@ public final class RpgCommands {
                 () -> Component.translatable("rpg_core.mobxp.set",
                         id.toString(),
                         xp,
-                        finalPredicate == null ? "" : finalPredicate.
-                                toString()),
+                        finalPredicate == null ? "" : finalPredicate.toString()),
                 true
         );
         return 1;
@@ -716,7 +841,6 @@ public final class RpgCommands {
 
         RpgPerkOffersEvent evt = new RpgPerkOffersEvent(player, nextTier, defaults);
         MinecraftForge.EVENT_BUS.post(evt);
-
         List<ResourceLocation> offers = List.copyOf(evt.offersView());
         if (!offers.contains(perkId)) {
             player.sendSystemMessage(Component.translatable("rpg_core.perks.choose.not_offered", nextTier));
@@ -820,6 +944,7 @@ public final class RpgCommands {
                                         target.sendSystemMessage(Component.translatable("rpg_core.class.set.done_to_target", classId.toString()));
                                         count++;
                                     }
+
                                     final int finalCount = count;
                                     ctx.getSource().sendSuccess(
                                             () -> Component.translatable("rpg_core.class.set.done_admin", classId.toString(), finalCount),
