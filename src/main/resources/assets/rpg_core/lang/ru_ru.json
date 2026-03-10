@@ -130,5 +130,18 @@
   "rpg_core.debug.class.duelist.desc": "Точный боец с защитными приёмами.",
   "rpg_core.debug.class.duelist.stat1": "+5% скорость атаки (позже)",
   "rpg_core.debug.class.duelist.stat2": "+5% окно парирования (позже)",
-  "rpg_core.perks.status.next_tier": "Следующий тир: %s (ур. %s)"
+  "rpg_core.perks.status.next_tier": "Следующий тир: %s (ур. %s)",
+  "rpg_core.money.get.self": "Баланс: %s",
+  "rpg_core.money.get.target": "Баланс %s: %s",
+  "rpg_core.money.add.to_target": "Вы получили %s монет. Новый баланс: %s",
+  "rpg_core.money.add.done_admin": "Добавлено %s монет для %s игрок(ов).",
+  "rpg_core.money.remove.to_target": "С вас снято %s монет. Новый баланс: %s",
+  "rpg_core.money.remove.done_admin": "Снято %s монет у %s игрок(ов).",
+  "rpg_core.money.remove.failed": "Не удалось снять деньги у %s игрок(ов): недостаточно средств.",
+  "rpg_core.money.set.to_target": "Ваш баланс установлен на %s.",
+  "rpg_core.money.set.done_admin": "Баланс установлен на %s для %s игрок(ов).",
+  "rpg_core.money.pay.self": "Нельзя перевести деньги самому себе.",
+  "rpg_core.money.pay.not_enough": "Недостаточно денег. Нужно: %s, текущий баланс: %s",
+  "rpg_core.money.pay.sent": "Вы отправили %s монет игроку %s. Новый баланс: %s",
+  "rpg_core.money.pay.received": "Вы получили %s монет от игрока %s. Новый баланс: %s"
 }

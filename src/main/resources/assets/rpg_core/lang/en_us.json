@@ -130,5 +130,18 @@
   "rpg_core.debug.class.duelist.desc": "Precise fighter with defensive tricks.",
   "rpg_core.debug.class.duelist.stat1": "+5% Attack Speed (later)",
   "rpg_core.debug.class.duelist.stat2": "+5% Parry Window (later)",
-  "rpg_core.perks.status.next_tier": "Next tier: %s (lvl %s)"
+  "rpg_core.perks.status.next_tier": "Next tier: %s (lvl %s)",
+  "rpg_core.money.get.self": "Balance: %s",
+  "rpg_core.money.get.target": "%s balance: %s",
+  "rpg_core.money.add.to_target": "You received %s coins. New balance: %s",
+  "rpg_core.money.add.done_admin": "Added %s coins to %s player(s).",
+  "rpg_core.money.remove.to_target": "%s coins were removed. New balance: %s",
+  "rpg_core.money.remove.done_admin": "Removed %s coins from %s player(s).",
+  "rpg_core.money.remove.failed": "Could not remove money from %s player(s): not enough balance.",
+  "rpg_core.money.set.to_target": "Your balance was set to %s.",
+  "rpg_core.money.set.done_admin": "Set balance to %s for %s player(s).",
+  "rpg_core.money.pay.self": "You cannot send money to yourself.",
+  "rpg_core.money.pay.not_enough": "Not enough money. Required: %s, current balance: %s",
+  "rpg_core.money.pay.sent": "You sent %s coins to %s. New balance: %s",
+  "rpg_core.money.pay.received": "You received %s coins from %s. New balance: %s"
 }

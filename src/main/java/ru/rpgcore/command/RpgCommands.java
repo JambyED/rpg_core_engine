@@ -2,6 +2,7 @@ package ru.rpgcore.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -29,7 +30,6 @@ import ru.rpgcore.core.profile.RpgProfile;
 import ru.rpgcore.core.profile.RpgProfileStorage;
 import ru.rpgcore.core.xp.RpgXpCurve;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -41,11 +41,12 @@ public final class RpgCommands {
         dispatcher.register(
                 Commands.literal("rpg")
                         .then(profile())
-                        .then(reset())      // OP-only + selector
-                        .then(addXp())      // OP-only
-                        .then(config())     // OP-only
-                        .then(hud())        // OP-only
-                        .then(mobXp())      // OP-only
+                        .then(reset())
+                        .then(addXp())
+                        .then(config())
+                        .then(hud())
+                        .then(mobXp())
+                        .then(money())
                         .then(perks())
                         .then(rpgClass())
         );
@@ -57,7 +58,7 @@ public final class RpgCommands {
     }
 
     /* =========================
-       /rpg hud on|off|status (OP only)
+       /rpg hud on|off|status
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> hud() {
         return Commands.literal("hud")
@@ -73,7 +74,7 @@ public final class RpgCommands {
         level.getGameRules().getRule(RpgGameRules.RPG_HUD_ENABLED).set(enabled, level.getServer());
 
         source.sendSuccess(
-                () -> Component.translatable(enabled ? "rpg_core.hud.enabled" : "rpg_core.hud.disabled"),
+                () -> Component.translatable(enabled ? "rpg_core.hud.toggle.enabled" : "rpg_core.hud.toggle.disabled"),
                 true
         );
         return 1;
@@ -84,20 +85,21 @@ public final class RpgCommands {
         boolean enabled = level.getGameRules().getBoolean(RpgGameRules.RPG_HUD_ENABLED);
 
         source.sendSuccess(
-                () -> Component.translatable("rpg_core.hud.status", enabled),
+                () -> Component.literal("RPG HUD: " + enabled),
                 false
         );
         return 1;
     }
 
     /* =========================
-       /rpg hud vanilla on|off|status (OP only)
+       /rpg hud vanilla on|off|status
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         return Commands.literal("vanilla")
                 .requires(src -> src.hasPermission(2))
                 .then(Commands.literal("on").executes(ctx -> setHideVanillaHud(ctx.getSource(), false)))
-                .then(Commands.literal("off").executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
+                .then(Commands.literal("off").
+                        executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
                 .then(Commands.literal("status").executes(ctx -> hideVanillaHudStatus(ctx.getSource())));
     }
 
@@ -106,7 +108,7 @@ public final class RpgCommands {
         level.getGameRules().getRule(RpgGameRules.RPG_HIDE_VANILLA_HUD).set(hide, level.getServer());
 
         source.sendSuccess(
-                () -> Component.translatable(hide ? "rpg_core.hud.vanilla_hidden" : "rpg_core.hud.vanilla_shown"),
+                () -> Component.translatable(hide ? "rpg_core.hud.hide_vanilla.enabled" : "rpg_core.hud.hide_vanilla.disabled"),
                 true
         );
         return 1;
@@ -117,7 +119,7 @@ public final class RpgCommands {
         boolean hide = level.getGameRules().getBoolean(RpgGameRules.RPG_HIDE_VANILLA_HUD);
 
         source.sendSuccess(
-                () -> Component.translatable("rpg_core.hud.vanilla_status", hide),
+                () -> Component.literal("Hide vanilla HUD: " + hide),
                 false
         );
         return 1;
@@ -158,6 +160,8 @@ public final class RpgCommands {
                             profile.perkTokensAvailable()
                     ));
 
+                    player.sendSystemMessage(Component.translatable("rpg_core.money.get.self", profile.balance()));
+
                     if (profile.hasClass()) {
                         player.sendSystemMessage(Component.translatable("rpg_core.class.get.value", profile.classId()));
                     } else {
@@ -169,7 +173,7 @@ public final class RpgCommands {
     }
 
     /* =========================
-       /rpg reset <targets> (OP only)
+       /rpg reset <targets>
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> reset() {
         return Commands.literal("reset")
@@ -180,8 +184,7 @@ public final class RpgCommands {
                             for (ServerPlayer p : EntityArgument.getPlayers(ctx, "targets")) {
                                 RpgLevelingService.reset(p);
                                 count++;
-                                p.sendSystemMessage(Component.
-                                        translatable("rpg_core.reset.done_admin_to_target"));
+                                p.sendSystemMessage(Component.translatable("rpg_core.reset.done_admin_to_target"));
                             }
                             final int finalCount = count;
                             ctx.getSource().sendSuccess(
@@ -194,7 +197,7 @@ public final class RpgCommands {
     }
 
     /* =========================
-       /rpg addxp (OP only)
+       /rpg addxp
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> addXp() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("addxp")
@@ -239,7 +242,206 @@ public final class RpgCommands {
     }
 
     /* =========================
-       /rpg config ... (OP only)
+       /rpg money ...
+       ========================= */
+    private static ArgumentBuilder<CommandSourceStack, ?> money() {
+        return Commands.literal("money")
+                .then(Commands.literal("get")
+                        .executes(ctx -> moneyGetSelf(ctx.getSource()))
+                        .then(Commands.argument("target", EntityArgument.player())
+                                .requires(src -> src.hasPermission(2))
+                                .executes(ctx -> moneyGetTarget(
+                                        ctx.getSource(),
+                                        EntityArgument.getPlayer(ctx, "target")
+                                ))
+                        )
+                )
+                .then(Commands.literal("pay")
+                        .executes(ctx -> failOnlyPlayer(ctx.getSource()))
+                        .then(Commands.argument("target", EntityArgument.player())
+                                .then(Commands.argument("amount", LongArgumentType.longArg(1L))
+                                        .executes(ctx -> moneyPay(
+                                                ctx.getSource(),
+                                                EntityArgument.getPlayer(ctx, "target"),
+                                                LongArgumentType.getLong(ctx, "amount")
+                                        ))
+                                )
+                        )
+                )
+                .then(Commands.literal("add")
+                        .
+                        requires(src -> src.hasPermission(2))
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .then(Commands.argument("amount", LongArgumentType.longArg(0L))
+                                        .executes(ctx -> moneyAdd(
+                                                ctx.getSource(),
+                                                EntityArgument.getPlayers(ctx, "targets"),
+                                                LongArgumentType.getLong(ctx, "amount")
+                                        ))
+                                )
+                        )
+                )
+                .then(Commands.literal("remove")
+                        .requires(src -> src.hasPermission(2))
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .then(Commands.argument("amount", LongArgumentType.longArg(0L))
+                                        .executes(ctx -> moneyRemove(
+                                                ctx.getSource(),
+                                                EntityArgument.getPlayers(ctx, "targets"),
+                                                LongArgumentType.getLong(ctx, "amount")
+                                        ))
+                                )
+                        )
+                )
+                .then(Commands.literal("set")
+                        .requires(src -> src.hasPermission(2))
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .then(Commands.argument("amount", LongArgumentType.longArg(0L))
+                                        .executes(ctx -> moneySet(
+                                                ctx.getSource(),
+                                                EntityArgument.getPlayers(ctx, "targets"),
+                                                LongArgumentType.getLong(ctx, "amount")
+                                        ))
+                                )
+                        )
+                );
+    }
+
+    private static int moneyGetSelf(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        RpgProfile profile = RpgProfileStorage.load(player);
+        source.sendSuccess(
+                () -> Component.translatable("rpg_core.money.get.self", profile.balance()),
+                false
+        );
+        return 1;
+    }
+
+    private static int moneyGetTarget(CommandSourceStack source, ServerPlayer target) {
+        RpgProfile profile = RpgProfileStorage.load(target);
+        source.sendSuccess(
+                () -> Component.translatable("rpg_core.money.get.target", target.getGameProfile().getName(), profile.balance()),
+                false
+        );
+        return 1;
+    }
+
+    private static int moneyPay(CommandSourceStack source, ServerPlayer target, long amount) {
+        if (!(source.getEntity() instanceof ServerPlayer sender)) return failOnlyPlayer(source);
+
+        if (sender.getUUID().equals(target.getUUID())) {
+            source.sendFailure(Component.translatable("rpg_core.money.pay.self"));
+            return 0;
+        }
+
+        RpgProfile senderProfile = RpgProfileStorage.load(sender);
+        if (!senderProfile.removeBalance(amount)) {
+            source.sendFailure(Component.translatable("rpg_core.money.pay.not_enough", amount, senderProfile.balance()));
+            return 0;
+        }
+
+        RpgProfile targetProfile = RpgProfileStorage.load(target);
+        targetProfile.addBalance(amount);
+
+        RpgProfileStorage.save(sender, senderProfile);
+        RpgProfileStorage.save(target, targetProfile);
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.money.pay.sent",
+                        amount,
+                        target.getGameProfile().getName(),
+                        senderProfile.balance()
+                ),
+                false
+        );
+
+        target.sendSystemMessage(Component.
+                translatable(
+                        "rpg_core.money.pay.received",
+                        amount,
+                        sender.getGameProfile().getName(),
+                        targetProfile.balance()
+                ));
+
+        return 1;
+    }
+
+    private static int moneyAdd(CommandSourceStack source, java.util.Collection<ServerPlayer> targets, long amount) {
+        int count = 0;
+        for (ServerPlayer p : targets) {
+            RpgProfile profile = RpgProfileStorage.load(p);
+            profile.addBalance(amount);
+            RpgProfileStorage.save(p, profile);
+
+            long newBalance = profile.balance();
+            p.sendSystemMessage(Component.translatable("rpg_core.money.add.to_target", amount, newBalance));
+            count++;
+        }
+
+        final int finalCount = count;
+        source.sendSuccess(
+                () -> Component.translatable("rpg_core.money.add.done_admin", amount, finalCount),
+                true
+        );
+        return finalCount;
+    }
+
+    private static int moneyRemove(CommandSourceStack source, java.util.Collection<ServerPlayer> targets, long amount) {
+        int count = 0;
+        int failed = 0;
+
+        for (ServerPlayer p : targets) {
+            RpgProfile profile = RpgProfileStorage.load(p);
+            if (!profile.removeBalance(amount)) {
+                failed++;
+                continue;
+            }
+
+            RpgProfileStorage.save(p, profile);
+            long newBalance = profile.balance();
+            p.sendSystemMessage(Component.translatable("rpg_core.money.remove.to_target", amount, newBalance));
+            count++;
+        }
+
+        final int finalCount = count;
+        final int finalFailed = failed;
+
+        if (finalCount > 0) {
+            source.sendSuccess(
+                    () -> Component.translatable("rpg_core.money.remove.done_admin", amount, finalCount),
+                    true
+            );
+        }
+        if (finalFailed > 0) {
+            source.sendFailure(Component.translatable("rpg_core.money.remove.failed", finalFailed));
+        }
+
+        return finalCount;
+    }
+
+    private static int moneySet(CommandSourceStack source, java.util.Collection<ServerPlayer> targets, long amount) {
+        int count = 0;
+        for (ServerPlayer p : targets) {
+            RpgProfile profile = RpgProfileStorage.load(p);
+            profile.setBalance(amount);
+            RpgProfileStorage.save(p, profile);
+
+            p.sendSystemMessage(Component.translatable("rpg_core.money.set.to_target", amount));
+            count++;
+        }
+
+        final int finalCount = count;
+        source.sendSuccess(
+                () -> Component.translatable("rpg_core.money.set.done_admin", amount, finalCount),
+                true
+        );
+        return finalCount;
+    }
+
+    /* =========================
+       /rpg config ...
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> config() {
         return Commands.literal("config")
@@ -265,8 +467,7 @@ public final class RpgCommands {
                                     }
                                     ServerLevel level = ctx.getSource().getLevel();
                                     RpgWorldConfigData.get(level).setMaxLevel(value);
-                                    ctx.getSource().sendSuccess(() -> Component.
-                                            translatable("rpg_core.config.maxlevel.set", value), true);
+                                    ctx.getSource().sendSuccess(() -> Component.translatable("rpg_core.config.maxlevel.set", value), true);
                                     return 1;
                                 })
                         )
@@ -274,7 +475,7 @@ public final class RpgCommands {
     }
 
     /* =========================
-       /rpg mobxp ... (OP only)
+       /rpg mobxp ...
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> mobXp() {
         return Commands.literal("mobxp")
@@ -340,7 +541,8 @@ public final class RpgCommands {
                 () -> Component.translatable("rpg_core.mobxp.set",
                         id.toString(),
                         xp,
-                        finalPredicate == null ? "" : finalPredicate.toString()),
+                        finalPredicate == null ? "" : finalPredicate.
+                                toString()),
                 true
         );
         return 1;
@@ -444,8 +646,7 @@ public final class RpgCommands {
     }
 
     private static int perksList(CommandSourceStack source) {
-        if (!(source.
-                getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
         RpgProfile profile = RpgProfileStorage.load(player);
         if (profile.chosenPerks().isEmpty()) {
@@ -471,10 +672,8 @@ public final class RpgCommands {
             return 1;
         }
 
-        // Core defaults (best-effort)
         List<ResourceLocation> defaults = RpgPerkOfferLogic.getOffersForTier(nextTier);
 
-        // Allow addons to override/replace
         RpgPerkOffersEvent evt = new RpgPerkOffersEvent(player, nextTier, defaults);
         MinecraftForge.EVENT_BUS.post(evt);
 
@@ -513,10 +712,8 @@ public final class RpgCommands {
             return 0;
         }
 
-        // Core defaults (best-effort)
         List<ResourceLocation> defaults = RpgPerkOfferLogic.getOffersForTier(nextTier);
 
-        // Allow addons to override/replace
         RpgPerkOffersEvent evt = new RpgPerkOffersEvent(player, nextTier, defaults);
         MinecraftForge.EVENT_BUS.post(evt);
 
@@ -526,7 +723,6 @@ public final class RpgCommands {
             return 0;
         }
 
-        // Apply
         profile.addPerk(perkId.toString());
         profile.setChosenPerkForTier(nextTier, perkId.toString());
         profile.spendPerkTokens(1);
@@ -545,8 +741,7 @@ public final class RpgCommands {
             profile.setPerkTokensSpent(0);
             RpgProfileStorage.save(p, profile);
 
-            p.
-                    sendSystemMessage(Component.translatable("rpg_core.perks.reset.done_admin_to_target"));
+            p.sendSystemMessage(Component.translatable("rpg_core.perks.reset.done_admin_to_target"));
             count++;
         }
         final int finalCount = count;
@@ -565,7 +760,7 @@ public final class RpgCommands {
         return Commands.literal("class")
                 .then(classGet())
                 .then(classList())
-                .then(classSet()); // OP-only
+                .then(classSet());
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> classGet() {
@@ -625,7 +820,6 @@ public final class RpgCommands {
                                         target.sendSystemMessage(Component.translatable("rpg_core.class.set.done_to_target", classId.toString()));
                                         count++;
                                     }
-
                                     final int finalCount = count;
                                     ctx.getSource().sendSuccess(
                                             () -> Component.translatable("rpg_core.class.set.done_admin", classId.toString(), finalCount),
@@ -636,5 +830,4 @@ public final class RpgCommands {
                         )
                 );
     }
-
 }
