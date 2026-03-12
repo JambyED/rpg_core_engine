@@ -16,7 +16,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.network.NetworkHooks;
 import ru.rpgcore.api.class_.event.RpgClassChangedEvent;
 import ru.rpgcore.api.perk.offer.RpgPerkOffersEvent;
 import ru.rpgcore.core.class_.RpgClassRegistries;
@@ -29,7 +31,9 @@ import ru.rpgcore.core.perk.RpgPerkRegistries;
 import ru.rpgcore.core.profile.RpgProfile;
 import ru.rpgcore.core.profile.RpgProfileStorage;
 import ru.rpgcore.core.storage.RpgStorage;
+import ru.rpgcore.core.storage.RpgStorageContainer;
 import ru.rpgcore.core.storage.RpgStorageManager;
+import ru.rpgcore.core.storage.RpgStorageMenu;
 import ru.rpgcore.core.storage.RpgStorageOwnerRef;
 import ru.rpgcore.core.storage.RpgStorageOwnerType;
 import ru.rpgcore.core.xp.RpgXpCurve;
@@ -93,17 +97,16 @@ public final class RpgCommands {
         return 1;
     }
 
-    /* =========================
-       /rpg hud vanilla on|off|status
+/* =========================
+/rpg hud vanilla on|off|status
        ========================= */
-    private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
-        return Commands.literal("vanilla")
-                .
-                requires(src -> src.hasPermission(2))
-                .then(Commands.literal("on").executes(ctx -> setHideVanillaHud(ctx.getSource(), false)))
-                .then(Commands.literal("off").executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
-                .then(Commands.literal("status").executes(ctx -> hideVanillaHudStatus(ctx.getSource())));
-    }
+private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
+    return Commands.literal("vanilla")
+            .requires(src -> src.hasPermission(2))
+            .then(Commands.literal("on").executes(ctx -> setHideVanillaHud(ctx.getSource(), false)))
+            .then(Commands.literal("off").executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
+            .then(Commands.literal("status").executes(ctx -> hideVanillaHudStatus(ctx.getSource())));
+}
 
     private static int setHideVanillaHud(CommandSourceStack source, boolean hide) {
         ServerLevel level = source.getLevel();
@@ -177,11 +180,11 @@ public final class RpgCommands {
     private static ArgumentBuilder<CommandSourceStack, ?> reset() {
         return Commands.literal("reset")
                 .requires(src -> src.hasPermission(2))
-                .then(Commands.argument("targets", EntityArgument.players())
+                .
+                then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> {
                             int count = 0;
-                            for (ServerPlayer p : EntityArgument.
-                                    getPlayers(ctx, "targets")) {
+                            for (ServerPlayer p : EntityArgument.getPlayers(ctx, "targets")) {
                                 RpgLevelingService.reset(p);
                                 count++;
                                 p.sendSystemMessage(Component.translatable("rpg_core.reset.done_admin_to_target"));
@@ -344,7 +347,8 @@ public final class RpgCommands {
         targetProfile.addBalance(amount);
 
         RpgProfileStorage.save(sender, senderProfile);
-        RpgProfileStorage.save(target, targetProfile);
+        RpgProfileStorage.
+                save(target, targetProfile);
 
         source.sendSuccess(
                 () -> Component.translatable(
@@ -458,8 +462,7 @@ public final class RpgCommands {
                         )
                         .then(Commands.literal("resize")
                                 .then(Commands.argument("size", IntegerArgumentType.integer(1))
-                                        .
-                                        executes(ctx -> storageResize(
+                                        .executes(ctx -> storageResize(
                                                 ctx.getSource(),
                                                 IntegerArgumentType.getInteger(ctx, "size")
                                         ))
@@ -467,6 +470,9 @@ public final class RpgCommands {
                         )
                         .then(Commands.literal("clear")
                                 .executes(ctx -> storageClear(ctx.getSource()))
+                        )
+                        .then(Commands.literal("open")
+                                .executes(ctx -> storageOpen(ctx.getSource()))
                         )
                 );
     }
@@ -490,11 +496,9 @@ public final class RpgCommands {
         }
 
         int nonEmpty = 0;
-
         for (int i = 0; i < storage.size(); i++) {
             if (!storage.getItem(i).isEmpty()) nonEmpty++;
         }
-
         final int usedSlots = nonEmpty;
 
         source.sendSuccess(
@@ -514,6 +518,11 @@ public final class RpgCommands {
 
         RpgStorageOwnerRef owner = testStorageOwner(player);
         RpgStorage storage = RpgStorageManager.getOrCreate(player.serverLevel(), owner, size);
+
+        if (storage.size() != size) {
+            storage.resize(size);
+            RpgStorageManager.save(player.serverLevel(), storage);
+        }
 
         source.sendSuccess(
                 () -> Component.translatable(
@@ -563,6 +572,25 @@ public final class RpgCommands {
                 () -> Component.translatable("rpg_core.storage.test.cleared", storage.storageId()),
                 true
         );
+        return 1;
+    }
+
+    private static int storageOpen(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        ServerLevel level = player.serverLevel();
+        RpgStorageOwnerRef owner = testStorageOwner(player);
+        RpgStorage storage = RpgStorageManager.getOrCreate(level, owner, 27);
+
+        NetworkHooks.openScreen(
+                player,
+                new SimpleMenuProvider(
+                        (id, inventory, p) -> new RpgStorageMenu(id, inventory, new RpgStorageContainer(level, storage)),
+                        Component.literal("Storage")
+                ),
+                buf -> buf.writeVarInt(storage.size())
+        );
+
         return 1;
     }
 
@@ -715,7 +743,8 @@ public final class RpgCommands {
         source.sendSuccess(() -> Component.translatable("rpg_core.mobxp.list.title"), false);
 
         all.entrySet().stream()
-                .sorted(Comparator.comparing(e -> e.getKey().toString()))
+                .sorted(Comparator.comparing(e -> e.getKey().
+                        toString()))
                 .forEach(e -> {
                     for (MobXpRule r : e.getValue()) {
                         String pred = r.nbtPredicate() == null ? "" : r.nbtPredicate().toString();
@@ -822,7 +851,7 @@ public final class RpgCommands {
         int nextTier = profile.perkTokensSpent() + 1;
 
         if (nextTier > profile.totalPerkTokensGranted()) {
-            player.sendSystemMessage(Component.translatable("rpg_core.perks.choose.no_tokens"));
+            player.sendSystemMessage(Component.translatable("rpg_core.perks.available.none"));
             return 0;
         }
 
@@ -841,6 +870,7 @@ public final class RpgCommands {
 
         RpgPerkOffersEvent evt = new RpgPerkOffersEvent(player, nextTier, defaults);
         MinecraftForge.EVENT_BUS.post(evt);
+
         List<ResourceLocation> offers = List.copyOf(evt.offersView());
         if (!offers.contains(perkId)) {
             player.sendSystemMessage(Component.translatable("rpg_core.perks.choose.not_offered", nextTier));

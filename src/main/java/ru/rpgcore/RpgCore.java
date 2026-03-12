@@ -12,6 +12,7 @@ import ru.rpgcore.command.RpgCommands;
 import ru.rpgcore.core.class_.RpgCoreClasses;
 import ru.rpgcore.core.config.RpgGameRules;
 import ru.rpgcore.core.perk.RpgCorePerks;
+import ru.rpgcore.core.storage.RpgStorageMenuType;
 import ru.rpgcore.event.MobXpEvents;
 import ru.rpgcore.network.RpgNetwork;
 
@@ -29,6 +30,9 @@ public final class RpgCore {
 
         // Debug classes (TEMP for testing Class GUI)
         RpgCoreClasses.register(modBus);
+
+        // Storage menu types
+        RpgStorageMenuType.MENUS.register(modBus);
 
         // Common init
         RpgGameRules.init();
