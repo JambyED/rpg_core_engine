@@ -13,6 +13,7 @@ import java.util.Objects;
  * - This service does not replace the current wallet stored in RpgProfile.
  * - It wraps profile balance access into one stable API for future systems.
  * - Future systems (bank, shop, guild treasury, taxes, fees, logs) should use this service.
+ * - All balance-changing operations should pass through this service.
  */
 public final class RpgEconomyService {
 
@@ -23,6 +24,7 @@ public final class RpgEconomyService {
         INVALID_AMOUNT,
         INSUFFICIENT_FUNDS,
         SAME_PLAYER,
+        POLICY_DENIED,
         FAILURE
     }
 
@@ -49,7 +51,7 @@ public final class RpgEconomyService {
 
     public static boolean canAfford(ServerPlayer player, long amount) {
         Objects.requireNonNull(player, "player");
-        if (amount < 0L) return false;
+        if (amount <= 0L) return false;
         return RpgProfileStorage.load(player).canAfford(amount);
     }
 
@@ -61,18 +63,45 @@ public final class RpgEconomyService {
         Objects.requireNonNull(player, "player");
 
         if (amount < 0L) {
+            long current = getBalance(player);
             return new Result(
                     ResultType.INVALID_AMOUNT,
                     amount,
-                    getBalance(player),
-                    getBalance(player),
+                    current,
+                    current,
                     "rpg_core.economy.invalid_amount"
+            );
+        }
+
+        RpgEconomyPolicyResult policy = checkPolicy(
+                player,
+                RpgTransactionType.ADMIN_SET,
+                playerId(player),
+                "",
+                amount,
+                "admin_set"
+        );
+        if (!policy.allowed()) {
+            long current = getBalance(player);
+            return new Result(
+                    ResultType.POLICY_DENIED,
+                    amount,
+                    current,
+                    current,
+                    policy.messageKey()
             );
         }
 
         RpgProfile profile = RpgProfileStorage.load(player);
         profile.setBalance(amount);
         RpgProfileStorage.save(player, profile);
+
+        RpgEconomyTransactionService.recordForPlayer(
+                RpgTransactionType.ADMIN_SET,
+                player,
+                amount,
+                "admin_set"
+        );
 
         return new Result(
                 ResultType.SUCCESS,
@@ -86,7 +115,7 @@ public final class RpgEconomyService {
     public static Result deposit(ServerPlayer player, long amount) {
         Objects.requireNonNull(player, "player");
 
-        if (amount < 0L) {
+        if (amount <= 0L) {
             long current = getBalance(player);
             return new Result(
                     ResultType.INVALID_AMOUNT,
@@ -97,11 +126,38 @@ public final class RpgEconomyService {
             );
         }
 
+        RpgEconomyPolicyResult policy = checkPolicy(
+                player,
+                RpgTransactionType.ADMIN_ADD,
+                "",
+                playerId(player),
+                amount,
+                "admin_add"
+        );
+        if (!policy.allowed()) {
+            long current = getBalance(player);
+            return new Result(
+                    ResultType.
+                            POLICY_DENIED,
+                    amount,
+                    current,
+                    current,
+                    policy.messageKey()
+            );
+        }
+
         RpgProfile profile = RpgProfileStorage.load(player);
         long before = profile.balance();
 
         profile.addBalance(amount);
         RpgProfileStorage.save(player, profile);
+
+        RpgEconomyTransactionService.recordForPlayer(
+                RpgTransactionType.ADMIN_ADD,
+                player,
+                amount,
+                "admin_add"
+        );
 
         return new Result(
                 ResultType.SUCCESS,
@@ -115,7 +171,7 @@ public final class RpgEconomyService {
     public static Result withdraw(ServerPlayer player, long amount) {
         Objects.requireNonNull(player, "player");
 
-        if (amount < 0L) {
+        if (amount <= 0L) {
             long current = getBalance(player);
             return new Result(
                     ResultType.INVALID_AMOUNT,
@@ -123,6 +179,25 @@ public final class RpgEconomyService {
                     current,
                     current,
                     "rpg_core.economy.invalid_amount"
+            );
+        }
+
+        RpgEconomyPolicyResult policy = checkPolicy(
+                player,
+                RpgTransactionType.ADMIN_REMOVE,
+                playerId(player),
+                "",
+                amount,
+                "admin_remove"
+        );
+        if (!policy.allowed()) {
+            long current = getBalance(player);
+            return new Result(
+                    ResultType.POLICY_DENIED,
+                    amount,
+                    current,
+                    current,
+                    policy.messageKey()
             );
         }
 
@@ -138,7 +213,15 @@ public final class RpgEconomyService {
                     "rpg_core.economy.insufficient_funds"
             );
         }
+
         RpgProfileStorage.save(player, profile);
+
+        RpgEconomyTransactionService.recordForPlayer(
+                RpgTransactionType.ADMIN_REMOVE,
+                player,
+                amount,
+                "admin_remove"
+        );
 
         return new Result(
                 ResultType.SUCCESS,
@@ -157,7 +240,7 @@ public final class RpgEconomyService {
         Objects.requireNonNull(from, "from");
         Objects.requireNonNull(to, "to");
 
-        if (amount < 0L) {
+        if (amount <= 0L) {
             long current = getBalance(from);
             return new Result(
                     ResultType.INVALID_AMOUNT,
@@ -176,6 +259,25 @@ public final class RpgEconomyService {
                     current,
                     current,
                     "rpg_core.economy.same_player"
+            );
+        }
+
+        RpgEconomyPolicyResult policy = checkPolicy(
+                from,
+                RpgTransactionType.TRANSFER,
+                playerId(from),
+                playerId(to),
+                amount,
+                "player_transfer"
+        );
+        if (!policy.allowed()) {
+            long current = getBalance(from);
+            return new Result(
+                    ResultType.POLICY_DENIED,
+                    amount,
+                    current,
+                    getBalance(to),
+                    policy.messageKey()
             );
         }
 
@@ -200,6 +302,14 @@ public final class RpgEconomyService {
         RpgProfileStorage.save(from, fromProfile);
         RpgProfileStorage.save(to, toProfile);
 
+        RpgEconomyTransactionService.recordPlayerToPlayer(
+                RpgTransactionType.TRANSFER,
+                from,
+                to,
+                amount,
+                "player_transfer"
+        );
+
         return new Result(
                 ResultType.SUCCESS,
                 amount,
@@ -207,5 +317,34 @@ public final class RpgEconomyService {
                 toProfile.balance(),
                 "rpg_core.economy.transfer.success"
         );
+    }
+
+    /* =========================
+       Internal helpers
+       ========================= */
+
+    private static RpgEconomyPolicyResult checkPolicy(
+            ServerPlayer player,
+            RpgTransactionType transactionType,
+            String sourceId,
+            String targetId,
+            long amount,
+            String reason
+    ) {
+        return RpgEconomyPolicyService.evaluate(
+                new RpgEconomyPolicyContext(
+                        player.serverLevel(),
+                        transactionType,
+                        sourceId,
+                        targetId,
+                        amount,
+                        reason
+                )
+        );
+    }
+
+    private static String playerId(ServerPlayer player) {
+        Objects.requireNonNull(player, "player");
+        return "player:" + player.getUUID();
     }
 }

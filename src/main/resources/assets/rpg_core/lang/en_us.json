@@ -160,5 +160,6 @@
   "rpg_core.storage.bank.not_found": "Bank storage not found.",
   "rpg_core.storage.bank.info": "Bank %s: size=%s, non-empty slots=%s",
   "rpg_core.economy.invalid_amount": "Invalid amount.",
-  "rpg_core.economy.operation_failed": "Economy operation failed."
+  "rpg_core.economy.operation_failed": "Economy operation failed.",
+  "rpg_core.economy.policy_denied": "Economy operation denied by policy."
 }
