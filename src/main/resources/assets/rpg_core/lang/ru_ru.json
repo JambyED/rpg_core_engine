@@ -148,5 +148,17 @@
   "rpg_core.storage.test.info": "Хранилище %s: размер=%s, непустых слотов=%s",
   "rpg_core.storage.test.created": "Тестовое хранилище создано: %s (размер=%s)",
   "rpg_core.storage.test.resized": "Тестовое хранилище изменено: %s (размер=%s)",
-  "rpg_core.storage.test.cleared": "Тестовое хранилище очищено: %s"
+  "rpg_core.storage.test.cleared": "Тестовое хранилище очищено: %s",
+  "rpg_core.storage.admin.invalid_owner_type": "Неверный тип владельца хранилища: %s",
+  "rpg_core.storage.admin.not_found": "Хранилище не найдено: %s",
+  "rpg_core.storage.admin.created": "Хранилище создано: %s (размер=%s)",
+  "rpg_core.storage.admin.info": "Хранилище %s: id=%s, размер=%s, непустых слотов=%s",
+  "rpg_core.storage.admin.resized": "Хранилище изменено: %s (размер=%s)",
+  "rpg_core.storage.admin.cleared": "Хранилище очищено: %s",
+  "rpg_core.storage.title.test": "Тестовое хранилище",
+  "rpg_core.storage.title.bank": "Банк",
+  "rpg_core.storage.bank.not_found": "Банковское хранилище не найдено.",
+  "rpg_core.storage.bank.info": "Банк %s: размер=%s, непустых слотов=%s",
+  "rpg_core.economy.invalid_amount": "Некорректное количество.",
+  "rpg_core.economy.operation_failed": "Экономическая операция завершилась ошибкой."
 }

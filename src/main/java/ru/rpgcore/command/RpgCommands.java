@@ -16,30 +16,29 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.SimpleMenuProvider;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.network.NetworkHooks;
 import ru.rpgcore.api.class_.event.RpgClassChangedEvent;
 import ru.rpgcore.api.perk.offer.RpgPerkOffersEvent;
 import ru.rpgcore.core.class_.RpgClassRegistries;
 import ru.rpgcore.core.config.MobXpRule;
 import ru.rpgcore.core.config.RpgGameRules;
 import ru.rpgcore.core.config.RpgWorldConfigData;
+import ru.rpgcore.core.economy.RpgEconomyService;
 import ru.rpgcore.core.level.RpgLevelingService;
 import ru.rpgcore.core.perk.RpgPerkOfferLogic;
 import ru.rpgcore.core.perk.RpgPerkRegistries;
 import ru.rpgcore.core.profile.RpgProfile;
 import ru.rpgcore.core.profile.RpgProfileStorage;
 import ru.rpgcore.core.storage.RpgStorage;
-import ru.rpgcore.core.storage.RpgStorageContainer;
-import ru.rpgcore.core.storage.RpgStorageManager;
-import ru.rpgcore.core.storage.RpgStorageMenu;
+import ru.rpgcore.core.storage.RpgStorageAccess;
 import ru.rpgcore.core.storage.RpgStorageOwnerRef;
 import ru.rpgcore.core.storage.RpgStorageOwnerType;
+import ru.rpgcore.core.storage.RpgStorageRefs;
 import ru.rpgcore.core.xp.RpgXpCurve;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public final class RpgCommands {
@@ -97,16 +96,16 @@ public final class RpgCommands {
         return 1;
     }
 
-/* =========================
-/rpg hud vanilla on|off|status
+    /* =========================
+       /rpg hud vanilla on|off|status
        ========================= */
-private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
-    return Commands.literal("vanilla")
-            .requires(src -> src.hasPermission(2))
-            .then(Commands.literal("on").executes(ctx -> setHideVanillaHud(ctx.getSource(), false)))
-            .then(Commands.literal("off").executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
-            .then(Commands.literal("status").executes(ctx -> hideVanillaHudStatus(ctx.getSource())));
-}
+    private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
+        return Commands.literal("vanilla")
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.literal("on").executes(ctx -> setHideVanillaHud(ctx.getSource(), false)))
+                .then(Commands.literal("off").executes(ctx -> setHideVanillaHud(ctx.getSource(), true)))
+                .then(Commands.literal("status").executes(ctx -> hideVanillaHudStatus(ctx.getSource())));
+    }
 
     private static int setHideVanillaHud(CommandSourceStack source, boolean hide) {
         ServerLevel level = source.getLevel();
@@ -180,8 +179,7 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
     private static ArgumentBuilder<CommandSourceStack, ?> reset() {
         return Commands.literal("reset")
                 .requires(src -> src.hasPermission(2))
-                .
-                then(Commands.argument("targets", EntityArgument.players())
+                .then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> {
                             int count = 0;
                             for (ServerPlayer p : EntityArgument.getPlayers(ctx, "targets")) {
@@ -312,18 +310,18 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
     private static int moneyGetSelf(CommandSourceStack source) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
-        RpgProfile profile = RpgProfileStorage.load(player);
+        long balance = RpgEconomyService.getBalance(player);
         source.sendSuccess(
-                () -> Component.translatable("rpg_core.money.get.self", profile.balance()),
+                () -> Component.translatable("rpg_core.money.get.self", balance),
                 false
         );
         return 1;
     }
 
     private static int moneyGetTarget(CommandSourceStack source, ServerPlayer target) {
-        RpgProfile profile = RpgProfileStorage.load(target);
+        long balance = RpgEconomyService.getBalance(target);
         source.sendSuccess(
-                () -> Component.translatable("rpg_core.money.get.target", target.getGameProfile().getName(), profile.balance()),
+                () -> Component.translatable("rpg_core.money.get.target", target.getGameProfile().getName(), balance),
                 false
         );
         return 1;
@@ -332,30 +330,28 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
     private static int moneyPay(CommandSourceStack source, ServerPlayer target, long amount) {
         if (!(source.getEntity() instanceof ServerPlayer sender)) return failOnlyPlayer(source);
 
-        if (sender.getUUID().equals(target.getUUID())) {
-            source.sendFailure(Component.translatable("rpg_core.money.pay.self"));
+        RpgEconomyService.Result result = RpgEconomyService.transfer(sender, target, amount);
+
+        if (!result.success()) {
+            switch (result.type()) {
+                case SAME_PLAYER -> source.sendFailure(Component.translatable("rpg_core.money.pay.self"));
+                case INSUFFICIENT_FUNDS -> source.sendFailure(Component.translatable(
+                        "rpg_core.money.pay.not_enough",
+                        amount,
+                        result.sourceBalance()
+                ));
+                case INVALID_AMOUNT -> source.sendFailure(Component.translatable("rpg_core.economy.invalid_amount"));
+                default -> source.sendFailure(Component.translatable("rpg_core.economy.operation_failed"));
+            }
             return 0;
         }
-
-        RpgProfile senderProfile = RpgProfileStorage.load(sender);
-        if (!senderProfile.removeBalance(amount)) {
-            source.sendFailure(Component.translatable("rpg_core.money.pay.not_enough", amount, senderProfile.balance()));
-            return 0;
-        }
-
-        RpgProfile targetProfile = RpgProfileStorage.load(target);
-        targetProfile.addBalance(amount);
-
-        RpgProfileStorage.save(sender, senderProfile);
-        RpgProfileStorage.
-                save(target, targetProfile);
 
         source.sendSuccess(
                 () -> Component.translatable(
                         "rpg_core.money.pay.sent",
                         amount,
                         target.getGameProfile().getName(),
-                        senderProfile.balance()
+                        result.sourceBalance()
                 ),
                 false
         );
@@ -364,7 +360,7 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
                 "rpg_core.money.pay.received",
                 amount,
                 sender.getGameProfile().getName(),
-                targetProfile.balance()
+                result.targetBalance()
         ));
 
         return 1;
@@ -373,12 +369,12 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
     private static int moneyAdd(CommandSourceStack source, java.util.Collection<ServerPlayer> targets, long amount) {
         int count = 0;
         for (ServerPlayer p : targets) {
-            RpgProfile profile = RpgProfileStorage.load(p);
-            profile.addBalance(amount);
-            RpgProfileStorage.save(p, profile);
+            RpgEconomyService.Result result = RpgEconomyService.deposit(p, amount);
+            if (!result.success()) {
+                continue;
+            }
 
-            long newBalance = profile.balance();
-            p.sendSystemMessage(Component.translatable("rpg_core.money.add.to_target", amount, newBalance));
+            p.sendSystemMessage(Component.translatable("rpg_core.money.add.to_target", amount, result.targetBalance()));
             count++;
         }
 
@@ -395,15 +391,13 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         int failed = 0;
 
         for (ServerPlayer p : targets) {
-            RpgProfile profile = RpgProfileStorage.load(p);
-            if (!profile.removeBalance(amount)) {
+            RpgEconomyService.Result result = RpgEconomyService.withdraw(p, amount);
+            if (!result.success()) {
                 failed++;
                 continue;
             }
 
-            RpgProfileStorage.save(p, profile);
-            long newBalance = profile.balance();
-            p.sendSystemMessage(Component.translatable("rpg_core.money.remove.to_target", amount, newBalance));
+            p.sendSystemMessage(Component.translatable("rpg_core.money.remove.to_target", amount, result.targetBalance()));
             count++;
         }
 
@@ -426,9 +420,10 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
     private static int moneySet(CommandSourceStack source, java.util.Collection<ServerPlayer> targets, long amount) {
         int count = 0;
         for (ServerPlayer p : targets) {
-            RpgProfile profile = RpgProfileStorage.load(p);
-            profile.setBalance(amount);
-            RpgProfileStorage.save(p, profile);
+            RpgEconomyService.Result result = RpgEconomyService.setBalance(p, amount);
+            if (!result.success()) {
+                continue;
+            }
 
             p.sendSystemMessage(Component.translatable("rpg_core.money.set.to_target", amount));
             count++;
@@ -443,53 +438,170 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
     }
 
     /* =========================
-       /rpg storage test ...
+       /rpg storage ...
        ========================= */
     private static ArgumentBuilder<CommandSourceStack, ?> storage() {
         return Commands.literal("storage")
-                .then(Commands.literal("test")
-                        .executes(ctx -> storageInfo(ctx.getSource()))
-                        .then(Commands.literal("info")
-                                .executes(ctx -> storageInfo(ctx.getSource()))
+                .then(storageTest())
+                .then(storageBank())
+                .then(storageAdmin());
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> storageTest() {
+        return Commands.literal("test")
+                .requires(src -> src.hasPermission(2))
+                .executes(ctx -> storageTestInfo(ctx.getSource()))
+                .then(Commands.literal("info")
+                        .executes(ctx -> storageTestInfo(ctx.getSource()))
+                )
+                .then(Commands.literal("create")
+                        .then(Commands.argument("size", IntegerArgumentType.integer(1))
+                                .executes(ctx -> storageTestCreate(
+                                        ctx.getSource(),
+                                        IntegerArgumentType.
+                                                getInteger(ctx, "size")
+                                ))
                         )
-                        .then(Commands.literal("create")
-                                .then(Commands.argument("size", IntegerArgumentType.integer(1))
-                                        .executes(ctx -> storageCreate(
-                                                ctx.getSource(),
-                                                IntegerArgumentType.getInteger(ctx, "size")
-                                        ))
+                )
+                .then(Commands.literal("resize")
+                        .then(Commands.argument("size", IntegerArgumentType.integer(1))
+                                .executes(ctx -> storageTestResize(
+                                        ctx.getSource(),
+                                        IntegerArgumentType.getInteger(ctx, "size")
+                                ))
+                        )
+                )
+                .then(Commands.literal("clear")
+                        .executes(ctx -> storageTestClear(ctx.getSource()))
+                )
+                .then(Commands.literal("open")
+                        .executes(ctx -> storageTestOpen(ctx.getSource()))
+                );
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> storageBank() {
+        return Commands.literal("bank")
+                .executes(ctx -> storageBankOpen(ctx.getSource()))
+                .then(Commands.literal("open")
+                        .executes(ctx -> storageBankOpen(ctx.getSource()))
+                )
+                .then(Commands.literal("info")
+                        .executes(ctx -> storageBankInfo(ctx.getSource()))
+                );
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> storageAdmin() {
+        return Commands.literal("admin")
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.literal("create")
+                        .then(Commands.argument("owner_type", StringArgumentType.word())
+                                .then(Commands.argument("owner_id", StringArgumentType.word())
+                                        .then(Commands.argument("suffix", StringArgumentType.word())
+                                                .then(Commands.argument("size", IntegerArgumentType.integer(1))
+                                                        .executes(ctx -> storageAdminCreate(
+                                                                ctx.getSource(),
+                                                                StringArgumentType.getString(ctx, "owner_type"),
+                                                                StringArgumentType.getString(ctx, "owner_id"),
+                                                                StringArgumentType.getString(ctx, "suffix"),
+                                                                IntegerArgumentType.getInteger(ctx, "size")
+                                                        ))
+                                                )
+                                        )
                                 )
                         )
-                        .then(Commands.literal("resize")
-                                .then(Commands.argument("size", IntegerArgumentType.integer(1))
-                                        .executes(ctx -> storageResize(
-                                                ctx.getSource(),
-                                                IntegerArgumentType.getInteger(ctx, "size")
-                                        ))
+                )
+                .then(Commands.literal("open")
+                        .then(Commands.argument("owner_type", StringArgumentType.word())
+                                .then(Commands.argument("owner_id", StringArgumentType.word())
+                                        .then(Commands.argument("suffix", StringArgumentType.word())
+                                                .executes(ctx -> storageAdminOpen(
+                                                        ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "owner_type"),
+                                                        StringArgumentType.getString(ctx, "owner_id"),
+                                                        StringArgumentType.getString(ctx, "suffix")
+                                                ))
+                                        )
                                 )
                         )
-                        .then(Commands.literal("clear")
-                                .executes(ctx -> storageClear(ctx.getSource()))
+                )
+                .then(Commands.literal("info")
+                        .then(Commands.argument("owner_type", StringArgumentType.word())
+                                .then(Commands.argument("owner_id", StringArgumentType.word())
+                                        .then(Commands.argument("suffix", StringArgumentType.word())
+                                                .
+                                                executes(ctx -> storageAdminInfo(
+                                                        ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "owner_type"),
+                                                        StringArgumentType.getString(ctx, "owner_id"),
+                                                        StringArgumentType.getString(ctx, "suffix")
+                                                ))
+                                        )
+                                )
                         )
-                        .then(Commands.literal("open")
-                                .executes(ctx -> storageOpen(ctx.getSource()))
+                )
+                .then(Commands.literal("resize")
+                        .then(Commands.argument("owner_type", StringArgumentType.word())
+                                .then(Commands.argument("owner_id", StringArgumentType.word())
+                                        .then(Commands.argument("suffix", StringArgumentType.word())
+                                                .then(Commands.argument("size", IntegerArgumentType.integer(1))
+                                                        .executes(ctx -> storageAdminResize(
+                                                                ctx.getSource(),
+                                                                StringArgumentType.getString(ctx, "owner_type"),
+                                                                StringArgumentType.getString(ctx, "owner_id"),
+                                                                StringArgumentType.getString(ctx, "suffix"),
+                                                                IntegerArgumentType.getInteger(ctx, "size")
+                                                        ))
+                                                )
+                                        )
+                                )
+                        )
+                )
+                .then(Commands.literal("clear")
+                        .then(Commands.argument("owner_type", StringArgumentType.word())
+                                .then(Commands.argument("owner_id", StringArgumentType.word())
+                                        .then(Commands.argument("suffix", StringArgumentType.word())
+                                                .executes(ctx -> storageAdminClear(
+                                                        ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "owner_type"),
+                                                        StringArgumentType.getString(ctx, "owner_id"),
+                                                        StringArgumentType.getString(ctx, "suffix")
+                                                ))
+                                        )
+                                )
                         )
                 );
     }
 
     private static RpgStorageOwnerRef testStorageOwner(ServerPlayer player) {
-        return new RpgStorageOwnerRef(
-                RpgStorageOwnerType.PLAYER,
-                player.getUUID().toString() + ":test"
-        );
+        return RpgStorageRefs.playerTest(player);
     }
 
-    private static int storageInfo(CommandSourceStack source) {
+    private static RpgStorageOwnerRef bankStorageOwner(ServerPlayer player) {
+        return RpgStorageRefs.playerBank(player);
+    }
+
+    private static RpgStorageOwnerRef adminStorageOwner(String ownerTypeRaw, String ownerId, String suffix) {
+        RpgStorageOwnerType ownerType = parseOwnerType(ownerTypeRaw);
+        return RpgStorageRefs.named(ownerType, ownerId, suffix);
+    }
+
+    private static RpgStorageOwnerType parseOwnerType(String raw) {
+        try {
+            return RpgStorageOwnerType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception e) {
+            throw new IllegalArgumentException("invalid owner type");
+        }
+    }
+
+    private static Component adminStorageTitle(RpgStorageOwnerRef owner) {
+        return Component.literal(owner.asKey());
+    }
+
+    private static int storageTestInfo(CommandSourceStack source) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
         RpgStorageOwnerRef owner = testStorageOwner(player);
-        RpgStorage storage = RpgStorageManager.get(player.serverLevel(), owner);
-
+        RpgStorage storage = RpgStorageAccess.get(player, owner);
         if (storage == null) {
             source.sendFailure(Component.translatable("rpg_core.storage.test.not_found"));
             return 0;
@@ -513,15 +625,14 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         return 1;
     }
 
-    private static int storageCreate(CommandSourceStack source, int size) {
+    private static int storageTestCreate(CommandSourceStack source, int size) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
-        RpgStorageOwnerRef owner = testStorageOwner(player);
-        RpgStorage storage = RpgStorageManager.getOrCreate(player.serverLevel(), owner, size);
+        RpgStorage storage = RpgStorageAccess.getOrCreatePlayerTest(player, size);
 
         if (storage.size() != size) {
             storage.resize(size);
-            RpgStorageManager.save(player.serverLevel(), storage);
+            RpgStorageAccess.save(player, storage);
         }
 
         source.sendSuccess(
@@ -535,13 +646,12 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         return 1;
     }
 
-    private static int storageResize(CommandSourceStack source, int size) {
+    private static int storageTestResize(CommandSourceStack source, int size) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
-        RpgStorageOwnerRef owner = testStorageOwner(player);
-        RpgStorage storage = RpgStorageManager.getOrCreate(player.serverLevel(), owner, size);
+        RpgStorage storage = RpgStorageAccess.getOrCreatePlayerTest(player, size);
         storage.resize(size);
-        RpgStorageManager.save(player.serverLevel(), storage);
+        RpgStorageAccess.save(player, storage);
 
         source.sendSuccess(
                 () -> Component.translatable(
@@ -554,11 +664,10 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         return 1;
     }
 
-    private static int storageClear(CommandSourceStack source) {
+    private static int storageTestClear(CommandSourceStack source) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
-        RpgStorageOwnerRef owner = testStorageOwner(player);
-        RpgStorage storage = RpgStorageManager.get(player.serverLevel(), owner);
+        RpgStorage storage = RpgStorageAccess.get(player, testStorageOwner(player));
 
         if (storage == null) {
             source.sendFailure(Component.translatable("rpg_core.storage.test.not_found"));
@@ -566,7 +675,7 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         }
 
         storage.clearAll();
-        RpgStorageManager.save(player.serverLevel(), storage);
+        RpgStorageAccess.save(player, storage);
 
         source.sendSuccess(
                 () -> Component.translatable("rpg_core.storage.test.cleared", storage.storageId()),
@@ -575,23 +684,160 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         return 1;
     }
 
-    private static int storageOpen(CommandSourceStack source) {
+    private static int storageTestOpen(CommandSourceStack source) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
-        ServerLevel level = player.serverLevel();
-        RpgStorageOwnerRef owner = testStorageOwner(player);
-        RpgStorage storage = RpgStorageManager.getOrCreate(level, owner, 27);
-
-        NetworkHooks.openScreen(
-                player,
-                new SimpleMenuProvider(
-                        (id, inventory, p) -> new RpgStorageMenu(id, inventory, new RpgStorageContainer(level, storage)),
-                        Component.literal("Storage")
-                ),
-                buf -> buf.writeVarInt(storage.size())
-        );
-
+        RpgStorageAccess.openPlayerTest(player, 27);
         return 1;
+    }
+
+    private static int storageBankOpen(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        RpgStorageAccess.openPlayerBank(player, 27);
+        return 1;
+    }
+
+    private static int storageBankInfo(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        RpgStorage storage = RpgStorageAccess.get(player, bankStorageOwner(player));
+        if (storage == null) {
+            source.sendFailure(Component.translatable("rpg_core.storage.bank.not_found"));
+            return 0;
+        }
+
+        int nonEmpty = 0;
+        for (int i = 0; i < storage.size(); i++) {
+            if (!storage.getItem(i).isEmpty()) nonEmpty++;
+        }
+        final int usedSlots = nonEmpty;
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.bank.info",
+                        storage.storageId(),
+                        storage.size(),
+                        usedSlots
+                ),
+                false
+        );
+        return 1;
+    }
+    private static int storageAdminCreate(CommandSourceStack source, String ownerType, String ownerId, String suffix, int size) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        try {
+            RpgStorageOwnerRef owner = adminStorageOwner(ownerType, ownerId, suffix);
+            RpgStorage storage = RpgStorageAccess.getOrCreate(player, owner, size);
+
+            if (storage.size() != size) {
+                storage.resize(size);
+                RpgStorageAccess.save(player, storage);
+            }
+
+            source.sendSuccess(
+                    () -> Component.translatable("rpg_core.storage.admin.created", owner.asKey(), storage.size()),
+                    true
+            );
+            return 1;
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+    }
+
+    private static int storageAdminOpen(CommandSourceStack source, String ownerType, String ownerId, String suffix) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        try {
+            RpgStorageOwnerRef owner = adminStorageOwner(ownerType, ownerId, suffix);
+            RpgStorageAccess.open(player, owner, 27, adminStorageTitle(owner));
+            return 1;
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+    }
+
+    private static int storageAdminInfo(CommandSourceStack source, String ownerType, String ownerId, String suffix) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        try {
+            RpgStorageOwnerRef owner = adminStorageOwner(ownerType, ownerId, suffix);
+            RpgStorage storage = RpgStorageAccess.get(player, owner);
+
+            if (storage == null) {
+                source.sendFailure(Component.translatable("rpg_core.storage.admin.not_found", owner.asKey()));
+                return 0;
+            }
+
+            int nonEmpty = 0;
+            for (int i = 0; i < storage.size(); i++) {
+                if (!storage.getItem(i).isEmpty()) nonEmpty++;
+            }
+            final int usedSlots = nonEmpty;
+
+            source.sendSuccess(
+                    () -> Component.translatable(
+                            "rpg_core.storage.admin.info",
+                            owner.asKey(),
+                            storage.storageId(),
+                            storage.size(),
+                            usedSlots
+                    ),
+                    false
+            );
+            return 1;
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+    }
+
+    private static int storageAdminResize(CommandSourceStack source, String ownerType, String ownerId, String suffix, int size) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
+        try {
+            RpgStorageOwnerRef owner = adminStorageOwner(ownerType, ownerId, suffix);
+            RpgStorage storage = RpgStorageAccess.getOrCreate(player, owner, size);
+            storage.resize(size);
+            RpgStorageAccess.save(player, storage);
+
+            source.sendSuccess(
+                    () -> Component.translatable("rpg_core.storage.admin.resized", owner.asKey(), storage.size()),
+                    true
+            );
+            return 1;
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+    }
+
+    private static int storageAdminClear(CommandSourceStack source, String ownerType, String ownerId, String suffix) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+        try {
+            RpgStorageOwnerRef owner = adminStorageOwner(ownerType, ownerId, suffix);
+            RpgStorage storage = RpgStorageAccess.get(player, owner);
+
+            if (storage == null) {
+                source.sendFailure(Component.translatable("rpg_core.storage.admin.not_found", owner.asKey()));
+                return 0;
+            }
+
+            storage.clearAll();
+            RpgStorageAccess.save(player, storage);
+
+            source.sendSuccess(
+                    () -> Component.translatable("rpg_core.storage.admin.cleared", owner.asKey()),
+                    true
+            );
+            return 1;
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
     }
 
     /* =========================
@@ -743,8 +989,7 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
         source.sendSuccess(() -> Component.translatable("rpg_core.mobxp.list.title"), false);
 
         all.entrySet().stream()
-                .sorted(Comparator.comparing(e -> e.getKey().
-                        toString()))
+                .sorted(Comparator.comparing(e -> e.getKey().toString()))
                 .forEach(e -> {
                     for (MobXpRule r : e.getValue()) {
                         String pred = r.nbtPredicate() == null ? "" : r.nbtPredicate().toString();
@@ -839,7 +1084,8 @@ private static ArgumentBuilder<CommandSourceStack, ?> vanillaHud() {
 
         player.sendSystemMessage(Component.translatable("rpg_core.perks.available.title", nextTier));
         for (ResourceLocation id : offers) {
-            player.sendSystemMessage(Component.literal(" - " + id));
+            player.
+                    sendSystemMessage(Component.literal(" - " + id));
         }
         return 1;
     }

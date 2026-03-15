@@ -148,5 +148,17 @@
   "rpg_core.storage.test.info": "Storage %s: size=%s, non-empty slots=%s",
   "rpg_core.storage.test.created": "Test storage created: %s (size=%s)",
   "rpg_core.storage.test.resized": "Test storage resized: %s (size=%s)",
-  "rpg_core.storage.test.cleared": "Test storage cleared: %s"
+  "rpg_core.storage.test.cleared": "Test storage cleared: %s",
+  "rpg_core.storage.admin.invalid_owner_type": "Invalid storage owner type: %s",
+  "rpg_core.storage.admin.not_found": "Storage not found: %s",
+  "rpg_core.storage.admin.created": "Storage created: %s (size=%s)",
+  "rpg_core.storage.admin.info": "Storage %s: id=%s, size=%s, non-empty slots=%s",
+  "rpg_core.storage.admin.resized": "Storage resized: %s (size=%s)",
+  "rpg_core.storage.admin.cleared": "Storage cleared: %s",
+  "rpg_core.storage.title.test": "Test Storage",
+  "rpg_core.storage.title.bank": "Bank",
+  "rpg_core.storage.bank.not_found": "Bank storage not found.",
+  "rpg_core.storage.bank.info": "Bank %s: size=%s, non-empty slots=%s",
+  "rpg_core.economy.invalid_amount": "Invalid amount.",
+  "rpg_core.economy.operation_failed": "Economy operation failed."
 }
