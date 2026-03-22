@@ -162,5 +162,12 @@
   "rpg_core.economy.invalid_amount": "Invalid amount.",
   "rpg_core.economy.operation_failed": "Economy operation failed.",
   "rpg_core.economy.policy_denied": "Economy operation denied by policy.",
-  "rpg_core.storage.access.denied": "You do not have access to this storage."
+  "rpg_core.storage.access.denied": "You do not have access to this storage.",
+  "rpg_core.storage.admin.access.invalid_subject_type": "Invalid access subject type: %s",
+  "rpg_core.storage.admin.access.invalid_permission": "Invalid access permission: %s",
+  "rpg_core.storage.admin.access.grant": "Granted %s access for storage %s to subject %s",
+  "rpg_core.storage.admin.access.revoke": "Revoked %s access for storage %s from subject %s",
+  "rpg_core.storage.admin.access.list.title": "Access rules for storage %s: %s",
+  "rpg_core.storage.admin.access.list.empty": "Storage %s has no access rules.",
+  "rpg_core.storage.admin.access.list.item": "- %s -> %s"
 }

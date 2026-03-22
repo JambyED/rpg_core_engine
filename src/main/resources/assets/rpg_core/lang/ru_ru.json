@@ -162,5 +162,12 @@
   "rpg_core.economy.invalid_amount": "Некорректное количество.",
   "rpg_core.economy.operation_failed": "Экономическая операция завершилась ошибкой.",
   "rpg_core.economy.policy_denied": "Экономическая операция запрещена правилом.",
-  "rpg_core.storage.access.denied": "У вас нет доступа к этому хранилищу."
+  "rpg_core.storage.access.denied": "У вас нет доступа к этому хранилищу.",
+  "rpg_core.storage.admin.access.invalid_subject_type": "Неверный тип субъекта доступа: %s",
+  "rpg_core.storage.admin.access.invalid_permission": "Неверное право доступа: %s",
+  "rpg_core.storage.admin.access.grant": "Выдан доступ %s для хранилища %s субъекту %s",
+  "rpg_core.storage.admin.access.revoke": "Снят доступ %s для хранилища %s у субъекта %s",
+  "rpg_core.storage.admin.access.list.title": "Правила доступа для хранилища %s: %s",
+  "rpg_core.storage.admin.access.list.empty": "Для хранилища %s правил доступа нет.",
+  "rpg_core.storage.admin.access.list.item": "- %s -> %s"
 }

@@ -19,6 +19,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.common.MinecraftForge;
 import ru.rpgcore.api.class_.event.RpgClassChangedEvent;
 import ru.rpgcore.api.perk.offer.RpgPerkOffersEvent;
+import ru.rpgcore.core.access.RpgAccessPermission;
+import ru.rpgcore.core.access.RpgAccessRule;
+import ru.rpgcore.core.access.RpgAccessSubject;
+import ru.rpgcore.core.access.RpgAccessSubjectType;
+import ru.rpgcore.core.access.RpgAccessSubjects;
 import ru.rpgcore.core.class_.RpgClassRegistries;
 import ru.rpgcore.core.config.MobXpRule;
 import ru.rpgcore.core.config.RpgGameRules;
@@ -31,6 +36,7 @@ import ru.rpgcore.core.profile.RpgProfile;
 import ru.rpgcore.core.profile.RpgProfileStorage;
 import ru.rpgcore.core.storage.RpgStorage;
 import ru.rpgcore.core.storage.RpgStorageAccess;
+import ru.rpgcore.core.storage.RpgStorageAccessAdmin;
 import ru.rpgcore.core.storage.RpgStorageOwnerRef;
 import ru.rpgcore.core.storage.RpgStorageOwnerType;
 import ru.rpgcore.core.storage.RpgStorageRefs;
@@ -173,29 +179,29 @@ public final class RpgCommands {
                 });
     }
 
-    /* =========================
-       /rpg reset <targets>
+/* =========================
+/rpg reset <targets>
        ========================= */
-    private static ArgumentBuilder<CommandSourceStack, ?> reset() {
-        return Commands.literal("reset")
-                .requires(src -> src.hasPermission(2))
-                .then(Commands.argument("targets", EntityArgument.players())
-                        .executes(ctx -> {
-                            int count = 0;
-                            for (ServerPlayer p : EntityArgument.getPlayers(ctx, "targets")) {
-                                RpgLevelingService.reset(p);
-                                count++;
-                                p.sendSystemMessage(Component.translatable("rpg_core.reset.done_admin_to_target"));
-                            }
-                            final int finalCount = count;
-                            ctx.getSource().sendSuccess(
-                                    () -> Component.translatable("rpg_core.reset.done_admin_summary", finalCount),
-                                    true
-                            );
-                            return finalCount;
-                        })
-                );
-    }
+private static ArgumentBuilder<CommandSourceStack, ?> reset() {
+    return Commands.literal("reset")
+            .requires(src -> src.hasPermission(2))
+            .then(Commands.argument("targets", EntityArgument.players())
+                    .executes(ctx -> {
+                        int count = 0;
+                        for (ServerPlayer p : EntityArgument.getPlayers(ctx, "targets")) {
+                            RpgLevelingService.reset(p);
+                            count++;
+                            p.sendSystemMessage(Component.translatable("rpg_core.reset.done_admin_to_target"));
+                        }
+                        final int finalCount = count;
+                        ctx.getSource().sendSuccess(
+                                () -> Component.translatable("rpg_core.reset.done_admin_summary", finalCount),
+                                true
+                        );
+                        return finalCount;
+                    })
+            );
+}
 
     /* =========================
        /rpg addxp
@@ -454,12 +460,12 @@ public final class RpgCommands {
                 .then(Commands.literal("info")
                         .executes(ctx -> storageTestInfo(ctx.getSource()))
                 )
-                .then(Commands.literal("create")
+                .
+                then(Commands.literal("create")
                         .then(Commands.argument("size", IntegerArgumentType.integer(1))
                                 .executes(ctx -> storageTestCreate(
                                         ctx.getSource(),
-                                        IntegerArgumentType.
-                                                getInteger(ctx, "size")
+                                        IntegerArgumentType.getInteger(ctx, "size")
                                 ))
                         )
                 )
@@ -525,11 +531,11 @@ public final class RpgCommands {
                         )
                 )
                 .then(Commands.literal("info")
-                        .then(Commands.argument("owner_type", StringArgumentType.word())
+                        .
+                        then(Commands.argument("owner_type", StringArgumentType.word())
                                 .then(Commands.argument("owner_id", StringArgumentType.word())
                                         .then(Commands.argument("suffix", StringArgumentType.word())
-                                                .
-                                                executes(ctx -> storageAdminInfo(
+                                                .executes(ctx -> storageAdminInfo(
                                                         ctx.getSource(),
                                                         StringArgumentType.getString(ctx, "owner_type"),
                                                         StringArgumentType.getString(ctx, "owner_id"),
@@ -569,6 +575,141 @@ public final class RpgCommands {
                                         )
                                 )
                         )
+                )
+                .then(storageAdminGrant())
+                .then(storageAdminRevoke())
+                .then(storageAdminList());
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> storageAdminGrant() {
+        return Commands.literal("grant")
+                .then(Commands.argument("owner_type", StringArgumentType.word())
+                        .then(Commands.argument("owner_id", StringArgumentType.word())
+                                .then(Commands.argument("suffix", StringArgumentType.word())
+                                        .then(Commands.literal("player")
+                                                .then(Commands.argument("target", EntityArgument.player())
+                                                        .executes(ctx -> storageAdminGrantPlayer(
+                                                                ctx.getSource(),
+                                                                StringArgumentType.getString(ctx, "owner_type"),
+                                                                StringArgumentType.getString(ctx, "owner_id"),
+                                                                StringArgumentType.getString(ctx, "suffix"),
+                                                                EntityArgument.getPlayer(ctx, "target"),
+                                                                "OPEN"
+                                                        ))
+                                                        .then(Commands.argument("permission", StringArgumentType.word())
+                                                                .executes(ctx -> storageAdminGrantPlayer(
+                                                                        ctx.getSource(),
+                                                                        StringArgumentType.getString(ctx, "owner_type"),
+                                                                        StringArgumentType.getString(ctx, "owner_id"),
+                                                                        StringArgumentType.getString(ctx, "suffix"),
+                                                                        EntityArgument.getPlayer(ctx, "target"),
+                                                                        StringArgumentType.getString(ctx, "permission")
+                                                                ))
+                                                        )
+                                                )
+                                        )
+                                        .then(Commands.literal("subject")
+                                                .then(Commands.argument("subject_type", StringArgumentType.word())
+                                                        .then(Commands.argument("subject_id", StringArgumentType.word())
+                                                                .executes(ctx -> storageAdminGrantSubject(
+                                                                        ctx.getSource(),
+                                                                        StringArgumentType.getString(ctx, "owner_type"),
+                                                                        StringArgumentType.getString(ctx, "owner_id"),
+                                                                        StringArgumentType.getString(ctx, "suffix"),
+                                                                        StringArgumentType.getString(ctx, "subject_type"),
+                                                                        StringArgumentType.getString(ctx, "subject_id"),
+                                                                        "OPEN"
+                                                                ))
+                                                                .then(Commands.argument("permission", StringArgumentType.word())
+                                                                        .executes(ctx -> storageAdminGrantSubject(
+                                                                                ctx.getSource(),
+                                                                                StringArgumentType.getString(ctx, "owner_type"),
+                                                                                StringArgumentType.getString(ctx, "owner_id"),
+                                                                                StringArgumentType.getString(ctx, "suffix"),
+                                                                                StringArgumentType.getString(ctx, "subject_type"),
+                                                                                StringArgumentType.getString(ctx, "subject_id"),
+                                                                                StringArgumentType.getString(ctx, "permission")
+                                                                        ))
+                                                                )
+                                                        )
+                                                )
+                                        )
+                                )
+                        )
+                );
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> storageAdminRevoke() {
+        return Commands.literal("revoke")
+                .then(Commands.argument("owner_type", StringArgumentType.word())
+                        .then(Commands.argument("owner_id", StringArgumentType.word())
+                                .then(Commands.argument("suffix", StringArgumentType.word())
+                                        .then(Commands.literal("player")
+                                                .then(Commands.argument("target", EntityArgument.player())
+                                                        .executes(ctx -> storageAdminRevokePlayer(
+                                                                ctx.getSource(),
+                                                                StringArgumentType.getString(ctx, "owner_type"),
+                                                                StringArgumentType.getString(ctx, "owner_id"),
+                                                                StringArgumentType.getString(ctx, "suffix"),
+                                                                EntityArgument.getPlayer(ctx, "target"),
+                                                                "OPEN"
+                                                        ))
+                                                        .then(Commands.argument("permission", StringArgumentType.word())
+                                                                .executes(ctx -> storageAdminRevokePlayer(
+                                                                        ctx.getSource(),
+                                                                        StringArgumentType.getString(ctx, "owner_type"),
+                                                                        StringArgumentType.getString(ctx, "owner_id"),
+                                                                        StringArgumentType.getString(ctx, "suffix"),
+                                                                        EntityArgument.getPlayer(ctx, "target"),
+                                                                        StringArgumentType.getString(ctx, "permission")
+                                                                ))
+                                                        )
+                                                )
+                                        )
+                                        .then(Commands.literal("subject")
+                                                .then(Commands.argument("subject_type", StringArgumentType.word())
+                                                        .then(Commands.argument("subject_id", StringArgumentType.word())
+                                                                .executes(ctx -> storageAdminRevokeSubject(
+                                                                        ctx.getSource(),
+                                                                        StringArgumentType.getString(ctx, "owner_type"),
+                                                                        StringArgumentType.getString(ctx, "owner_id"),
+                                                                        StringArgumentType.getString(ctx, "suffix"),
+                                                                        StringArgumentType.getString(ctx, "subject_type"),
+                                                                        StringArgumentType.getString(ctx, "subject_id"),
+                                                                        "OPEN"
+                                                                ))
+                                                                .then(Commands.argument("permission", StringArgumentType.word())
+                                                                        .executes(ctx -> storageAdminRevokeSubject(
+                                                                                ctx.getSource(),
+                                                                                StringArgumentType.getString(ctx, "owner_type"),
+                                                                                StringArgumentType.getString(ctx, "owner_id"),
+                                                                                StringArgumentType.getString(ctx, "suffix"),
+                                                                                StringArgumentType.getString(ctx, "subject_type"),
+                                                                                StringArgumentType.getString(ctx, "subject_id"),
+                                                                                StringArgumentType.getString(ctx, "permission")
+                                                                        ))
+                                                                )
+                                                        )
+                                                )
+                                        )
+                                )
+                        )
+                );
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> storageAdminList() {
+        return Commands.literal("list")
+                .then(Commands.argument("owner_type", StringArgumentType.word())
+                        .then(Commands.argument("owner_id", StringArgumentType.word())
+                                .then(Commands.argument("suffix", StringArgumentType.word())
+                                        .executes(ctx -> storageAdminListRules(
+                                                ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "owner_type"),
+                                                StringArgumentType.getString(ctx, "owner_id"),
+                                                StringArgumentType.getString(ctx, "suffix")
+                                        ))
+                                )
+                        )
                 );
     }
 
@@ -591,6 +732,34 @@ public final class RpgCommands {
         } catch (Exception e) {
             throw new IllegalArgumentException("invalid owner type");
         }
+    }
+
+    private static RpgAccessSubjectType parseSubjectType(String raw) {
+        try {
+            return RpgAccessSubjectType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception e) {
+            throw new IllegalArgumentException("invalid subject type");
+        }
+    }
+
+    private static RpgAccessPermission parseAccessPermission(String raw) {
+        try {
+            return RpgAccessPermission.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception e) {
+            throw new IllegalArgumentException("invalid permission");
+        }
+    }
+
+    private static RpgAccessSubject adminAccessSubject(String subjectTypeRaw, String subjectId) {
+        RpgAccessSubjectType subjectType = parseSubjectType(subjectTypeRaw);
+        return switch (subjectType) {
+            case PLAYER -> RpgAccessSubjects.player(subjectId);
+            case GUILD -> RpgAccessSubjects.guild(subjectId);
+            case FACTION -> RpgAccessSubjects.faction(subjectId);
+            case NPC -> RpgAccessSubjects.npc(subjectId);
+            case WORLD -> RpgAccessSubjects.world(subjectId);
+            case SERVER -> RpgAccessSubjects.server(subjectId);
+        };
     }
 
     private static Component adminStorageTitle(RpgStorageOwnerRef owner) {
@@ -700,7 +869,6 @@ public final class RpgCommands {
 
     private static int storageBankInfo(CommandSourceStack source) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
-
         RpgStorage storage = RpgStorageAccess.get(player, bankStorageOwner(player));
         if (storage == null) {
             source.sendFailure(Component.translatable("rpg_core.storage.bank.not_found"));
@@ -724,6 +892,7 @@ public final class RpgCommands {
         );
         return 1;
     }
+
     private static int storageAdminCreate(CommandSourceStack source, String ownerType, String ownerId, String suffix, int size) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
 
@@ -800,7 +969,8 @@ public final class RpgCommands {
 
         try {
             RpgStorageOwnerRef owner = adminStorageOwner(ownerType, ownerId, suffix);
-            RpgStorage storage = RpgStorageAccess.getOrCreate(player, owner, size);
+            RpgStorage storage = RpgStorageAccess.
+                    getOrCreate(player, owner, size);
             storage.resize(size);
             RpgStorageAccess.save(player, storage);
 
@@ -817,6 +987,7 @@ public final class RpgCommands {
 
     private static int storageAdminClear(CommandSourceStack source, String ownerType, String ownerId, String suffix) {
         if (!(source.getEntity() instanceof ServerPlayer player)) return failOnlyPlayer(source);
+
         try {
             RpgStorageOwnerRef owner = adminStorageOwner(ownerType, ownerId, suffix);
             RpgStorage storage = RpgStorageAccess.get(player, owner);
@@ -838,6 +1009,227 @@ public final class RpgCommands {
             source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
             return 0;
         }
+    }
+
+    private static int storageAdminGrantPlayer(
+            CommandSourceStack source,
+            String ownerType,
+            String ownerId,
+            String suffix,
+            ServerPlayer target,
+            String permissionRaw
+    ) {
+        RpgStorageOwnerRef owner;
+        RpgAccessPermission permission;
+
+        try {
+            owner = adminStorageOwner(ownerType, ownerId, suffix);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+
+        try {
+            permission = parseAccessPermission(permissionRaw);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.access.invalid_permission", permissionRaw));
+            return 0;
+        }
+
+        RpgAccessSubject subject = RpgAccessSubjects.player(target);
+        RpgStorageAccessAdmin.grant(source.getLevel(), subject, permission, owner);
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.admin.access.grant",
+                        permission.name(),
+                        owner.asKey(),
+                        subject.asKey()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int storageAdminGrantSubject(
+            CommandSourceStack source,
+            String ownerType,
+            String ownerId,
+            String suffix,
+            String subjectTypeRaw,
+            String subjectId,
+            String permissionRaw
+    ) {
+        RpgStorageOwnerRef owner;
+        RpgAccessPermission permission;
+        RpgAccessSubject subject;
+
+        try {
+            owner = adminStorageOwner(ownerType, ownerId, suffix);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+
+        try {
+            subject = adminAccessSubject(subjectTypeRaw, subjectId);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.access.invalid_subject_type", subjectTypeRaw));
+            return 0;
+        }
+
+        try {
+            permission = parseAccessPermission(permissionRaw);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.access.invalid_permission", permissionRaw));
+            return 0;
+        }
+
+        RpgStorageAccessAdmin.grant(source.getLevel(), subject, permission, owner);
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.admin.access.grant",
+                        permission.name(),
+                        owner.asKey(),
+                        subject.asKey()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int storageAdminRevokePlayer(
+            CommandSourceStack source,
+            String ownerType,
+            String ownerId,
+            String suffix,
+            ServerPlayer target,
+            String permissionRaw
+    ) {
+        RpgStorageOwnerRef owner;
+        RpgAccessPermission permission;
+
+        try {
+            owner = adminStorageOwner(ownerType, ownerId, suffix);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+
+        try {
+            permission = parseAccessPermission(permissionRaw);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.access.invalid_permission", permissionRaw));
+            return 0;
+        }
+
+        RpgAccessSubject subject = RpgAccessSubjects.player(target);
+        RpgStorageAccessAdmin.revoke(source.getLevel(), subject, permission, owner);
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.admin.access.revoke",
+                        permission.name(),
+                        owner.asKey(),
+                        subject.asKey()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int storageAdminRevokeSubject(
+            CommandSourceStack source,
+            String ownerType,
+            String ownerId,
+            String suffix,
+            String subjectTypeRaw,
+            String subjectId,
+            String permissionRaw
+    ) {
+        RpgStorageOwnerRef owner;
+        RpgAccessPermission permission;
+        RpgAccessSubject subject;
+
+        try {
+            owner = adminStorageOwner(ownerType, ownerId, suffix);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+
+        try {
+            subject = adminAccessSubject(subjectTypeRaw, subjectId);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.access.invalid_subject_type", subjectTypeRaw));
+            return 0;
+        }
+
+        try {
+            permission = parseAccessPermission(permissionRaw);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.access.invalid_permission", permissionRaw));
+            return 0;
+        }
+
+        RpgStorageAccessAdmin.revoke(source.getLevel(), subject, permission, owner);
+
+        source.sendSuccess(
+                () -> Component.translatable(
+                        "rpg_core.storage.admin.access.revoke",
+                        permission.name(),
+                        owner.asKey(),
+                        subject.asKey()
+                ),
+                true
+        );
+        return 1;
+    }
+
+    private static int storageAdminListRules(
+            CommandSourceStack source,
+            String ownerType,
+            String ownerId,
+            String suffix
+    ) {
+        RpgStorageOwnerRef owner;
+
+        try {
+            owner = adminStorageOwner(ownerType, ownerId, suffix);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.translatable("rpg_core.storage.admin.invalid_owner_type", ownerType));
+            return 0;
+        }
+
+        List<RpgAccessRule> rules = RpgStorageAccessAdmin.rulesForStorage(source.
+                getLevel(), owner);
+
+        source.sendSuccess(
+                () -> Component.translatable("rpg_core.storage.admin.access.list.title", owner.asKey(), rules.size()),
+                false
+        );
+
+        if (rules.isEmpty()) {
+            source.sendSuccess(
+                    () -> Component.translatable("rpg_core.storage.admin.access.list.empty", owner.asKey()),
+                    false
+            );
+            return 1;
+        }
+
+        rules.stream()
+                .sorted(Comparator.comparing(rule -> rule.subject().asKey() + "|" + rule.permission().name()))
+                .forEach(rule -> source.sendSuccess(
+                        () -> Component.translatable(
+                                "rpg_core.storage.admin.access.list.item",
+                                rule.subject().asKey(),
+                                rule.permission().name()
+                        ),
+                        false
+                ));
+
+        return rules.size();
     }
 
     /* =========================
@@ -989,7 +1381,8 @@ public final class RpgCommands {
         source.sendSuccess(() -> Component.translatable("rpg_core.mobxp.list.title"), false);
 
         all.entrySet().stream()
-                .sorted(Comparator.comparing(e -> e.getKey().toString()))
+                .sorted(Comparator.comparing(e -> e.getKey().
+                        toString()))
                 .forEach(e -> {
                     for (MobXpRule r : e.getValue()) {
                         String pred = r.nbtPredicate() == null ? "" : r.nbtPredicate().toString();
@@ -1084,8 +1477,7 @@ public final class RpgCommands {
 
         player.sendSystemMessage(Component.translatable("rpg_core.perks.available.title", nextTier));
         for (ResourceLocation id : offers) {
-            player.
-                    sendSystemMessage(Component.literal(" - " + id));
+            player.sendSystemMessage(Component.literal(" - " + id));
         }
         return 1;
     }
