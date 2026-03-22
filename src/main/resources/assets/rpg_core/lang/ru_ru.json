@@ -161,5 +161,6 @@
   "rpg_core.storage.bank.info": "Банк %s: размер=%s, непустых слотов=%s",
   "rpg_core.economy.invalid_amount": "Некорректное количество.",
   "rpg_core.economy.operation_failed": "Экономическая операция завершилась ошибкой.",
-  "rpg_core.economy.policy_denied": "Экономическая операция запрещена правилом."
+  "rpg_core.economy.policy_denied": "Экономическая операция запрещена правилом.",
+  "rpg_core.storage.access.denied": "У вас нет доступа к этому хранилищу."
 }

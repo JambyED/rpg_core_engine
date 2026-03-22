@@ -22,7 +22,6 @@ public final class RpgAccessEvaluator {
             RpgAccessPermission permission,
             RpgAccessTarget target
     ) {
-
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(permission, "permission");
         Objects.requireNonNull(target, "target");
@@ -31,15 +30,12 @@ public final class RpgAccessEvaluator {
                 RpgAccessService.resolveSubjects(player);
 
         for (RpgAccessSubject subject : subjects) {
-
             List<RpgAccessRule> rules =
-                    RpgAccessRuleRegistry.getRulesForSubject(subject);
+                    RpgAccessRuleRegistry.getRulesForSubject(player.serverLevel(), subject);
 
             for (RpgAccessRule rule : rules) {
-
                 if (rule.permission() == permission &&
                         rule.target().equals(target)) {
-
                     return true;
                 }
             }
