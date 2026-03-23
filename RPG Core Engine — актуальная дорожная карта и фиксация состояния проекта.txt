@@ -1,0 +1,631 @@
+RPG Core Engine — актуальная дорожная карта и фиксация состояния проекта
+
+1. Назначение проекта
+
+RPG Core Engine — это инфраструктурное ядро для модульной RPG-системы в Minecraft.
+
+Это не контентный мод, а именно движок / core framework, на базе которого строятся отдельные аддоны и игровые системы.
+
+Ядро должно содержать только:
+ • системные слои
+ • API
+ • runtime-механику
+ • хранение данных
+ • экономику
+ • storage
+ • права доступа
+ • базовые GUI/HUD foundations
+ • сетевую синхронизацию
+ • универсальные механики, которые нужны многим аддонам
+
+Ядро не должно содержать:
+ • конкретных NPC как контент
+ • сюжет
+ • конкретные города
+ • конкретные квесты как контент
+ • готовые игровые фракции как контентные сущности
+ • готовые игровые сцены
+ • наполненные торговые точки
+ • прикладное наполнение мира
+
+Итоговый принцип:
+ • Core = infrastructure
+ • Addons = gameplay systems and content over infrastructure
+
+⸻
+
+2. Главный архитектурный принцип проекта
+
+Во всём проекте запрещено смешивать:
+ • описание системы
+ • runtime-состояние
+
+Базовое правило:
+ • registry = definition
+ • runtime = instance state
+
+Это правило обязательно соблюдать для:
+ • classes
+ • perks
+ • storage
+ • access rules
+ • dialogues
+ • quests
+ • services
+ • markers
+ • cutscenes
+ • NPC definitions
+
+Это один из основных архитектурных столпов проекта и его нельзя нарушать в дальнейшей разработке.
+
+⸻
+
+3. Неподвижные архитектурные ограничения
+
+В проекте всегда должны сохраняться следующие правила:
+
+3.1. Ядро не становится аддоном
+
+Ядро должно оставаться инфраструктурным и не должно самовольно превращаться в content-mod.
+
+3.2. Нельзя смешивать core и addon logic
+
+Если логика относится к конкретному аддону или игровому наполнению, она не должна “просачиваться” в core.
+
+3.3. HUD / GUI — обязательная часть ядра
+
+Визуальная часть не считается второстепенной.
+HUD, GUI foundations, service GUI style и UI/UX polish — обязательные части ядра, а не “когда-нибудь потом”.
+
+3.4. Anti-dupe и server-authoritative design должны учитываться заранее
+
+Особенно для:
+ • economy
+ • storage
+ • service GUI
+ • NPC services
+ • shops
+ • bankers
+ • guild services
+
+Нельзя проектировать будущие сервисы так, чтобы появлялись дыры под:
+ • лаги
+ • повторные запросы
+ • двойное исполнение операций
+ • дюп предметов/денег
+
+3.5. GitHub — основной источник истины
+
+Реальный код в GitHub считается основным состоянием проекта.
+Если нужно что-то подтвердить по реализации, сначала смотрится реальный код, а не предположение “по памяти”.
+
+3.6. Все игровые операции должны быть server-authoritative
+
+Любые действия, влияющие на:
+ • экономику
+ • предметы
+ • storage
+ • сервисы (покупки, банки, NPC)
+
+должны выполняться на сервере.
+
+Клиент не должен иметь возможности:
+ • инициировать выполнение без серверной проверки
+ • повторно исполнять действие
+ • обходить access/economy ограничения
+
+В будущем обязательно:
+ • request ids
+ • one-shot execution
+ • atomic application of results
+
+
+4. Утверждённые аддоны проекта
+
+На текущий момент согласованы только следующие аддоны:
+ 1. Classes & Progression Addon
+ 2. NPC Addon
+ 3. Guild Addon
+ 4. Map / Minimap Addon
+ 5. Cutscene Addon
+
+Нельзя самовольно добавлять новые “утверждённые аддоны”, если они отдельно не зафиксированы пользователем.
+
+⸻
+
+5. Что важно помнить по каждому утверждённому аддону
+
+5.1. Classes & Progression Addon
+
+Это аддон поверх class/perk/xp/profile foundation ядра.
+
+Он должен использовать:
+ • Class API
+ • Perk API
+ • XP API
+ • profile/progression hooks
+
+Он отвечает за:
+ • расширенную систему развития
+ • более глубокую прокачку
+ • дополнительный progression layer поверх базового ядра
+
+5.2. NPC Addon
+
+Это большой системный аддон уровня не хуже CustomNPC, но глубже, удобнее и сильнее интегрированный с ядром.
+
+В него входят:
+ • NPC system
+ • dialogues
+ • trading
+ • bankers
+ • service NPC
+ • guild NPC
+ • faction-related NPC logic
+ • routes, patrols, behaviour
+ • интеграция со storage
+ • интеграция с economy
+ • интеграция с access/permission
+ • базовый и расширенный функционал уровня CustomNPC+
+
+Критически важно:
+в NPC Addon обязательно входит базовая quest system.
+
+Минимум для quest-части:
+ • выдача квестов через NPC
+ • отслеживание состояния
+ • интеграция с диалогами
+ • интеграция с наградами
+ • интеграция с маркерами
+ • деление квестов по типам:
+ • важные
+ • второстепенные
+ • дополнительные / побочные
+
+Если позже появятся повторяемые квесты — это уже расширение.
+Но базовая quest system обязана входить именно в NPC Addon.
+
+5.3. Guild Addon
+
+Это отдельный аддон.
+
+Он отвечает за:
+ • создание гильдий
+• членство
+ • роли
+ • ранги
+ • права
+ • доступы к guild storage
+ • интеграцию с NPC Addon
+ • интеграцию с economy
+ • интеграцию с access/permission system
+
+5.4. Map / Minimap Addon
+
+Это отдельный аддон.
+
+Он отвечает за:
+ • мини-карту
+ • карту мира
+ • отображение сюжетных NPC
+ • отображение зон квестов
+ • отображение точек интереса
+ • навигационные элементы для игрока
+
+Это обязательное направление и оно уже отдельно зафиксировано.
+
+5.5. Cutscene Addon
+
+Это отдельный аддон.
+
+Он отвечает за:
+ • систему кат-сцен
+ • последовательности сцен
+ • запуск сцен по условиям/событиям
+ • интеграцию с NPC, диалогами, квестами, действиями
+
+Критически важно:
+Cutscene Addon обязан иметь editor.
+
+Редактор должен позволять:
+ • создавать сцену
+ • задавать этапы
+ • задавать условия
+ • задавать действия
+ • определять участников
+ • настраивать последовательность выполнения
+
+⸻
+
+6. Что уже реализовано в ядре
+
+К текущему моменту в ядре уже реализованы следующие подсистемы.
+
+6.1. Player Profile Core
+
+Сделано:
+ • профиль игрока
+ • хранение уровня
+ • хранение XP
+ • хранение выбранного класса
+ • хранение перков
+ • хранение баланса
+ • серверное сохранение данных
+
+6.2. XP / Level System
+
+Сделано:
+ • начисление XP
+ • пересчёт уровня
+ • кривая прогрессии
+ • world-configurable логика
+
+6.3. Class System
+
+Сделано:
+ • class registry
+ • class API
+ • хранение класса
+ • смена класса
+ • GUI классов
+ • синхронизация
+
+6.4. Perk System
+
+Сделано:
+ • perk registry
+ • perk API
+ • tier-based система
+ • выбор и хранение перков
+ • GUI перков
+ • offer logic
+
+6.5. Economy Base
+
+Сделано:
+ • wallet / balance
+ • economy service
+ • money commands
+ • transaction foundation
+ • transaction wiring
+ • transaction persistence
+ • policy foundation
+
+Это означает:
+ • баланс изменяется через единый сервис
+ • операции записываются как транзакции
+ • транзакции сохраняются в мире
+ • заложен policy-layer под anti-abuse / anti-dupe foundation
+
+6.6. Storage System
+
+Сделано:
+ • runtime storages
+ • owner refs
+ • storage owner types
+ • storage manager
+ • storage saved data
+ • storage container / menu / screen
+ • storage access layer
+ • storage admin layer
+
+6.7. GUI Base
+
+Сделано:
+ • Character GUI
+ • Class GUI
+ • Perk GUI
+ • Storage GUI
+ • HUD foundation
+ • скрытие vanilla HUD
+ • client-side GUI foundations
+
+6.8. Network Layer
+
+Сделано:
+ • C2S / S2C messages для профиля, классов, перков
+ • клиентские кэши
+ • синхронизация профиля
+
+6.9. Localization
+
+Сделано:
+ • ru_ru
+ • en_us
+ • строки для HUD, GUI, economy, storage, classes, perks, commands
+
+⸻
+
+7. Access Core — текущее фактическое состояние
+
+Access system уже не находится на нулевой стадии.
+Она уже собрана как рабочий блок ядра.
+
+Сделано:
+ • access identity foundation
+ • access permission types
+ • access target/rule model
+ • access rule registry
+ • access evaluator
+ • access persistence
+ • access manager
+
+Рабочая permission-модель:
+ • subject → permission → target → evaluation
+
+Что уже заложено концептуально и в коде:
+ • access subject types
+ • access subjects
+ • access subject resolution service
+ • access permission vocabulary
+ • access target types
+ • access targets
+ • access rules
+ • access rule registry
+ • access evaluator
+ • access persistence через SavedData
+ • high-level access manager
+
+Как пример реального access foundation используется RpgAccessSubject с валидируемой identity-моделью субъекта доступа  
+
+⸻
+
+8. Storage + Access — текущее фактическое состояние
+
+Этот блок уже зашёл далеко и не должен считаться “только начатым”.
+
+Сделано:
+ • storage access integration по OPEN
+ • player-owned storages продолжают работать
+ • admin/debug storage paths не сломаны
+ • storage permission utilities
+ • storage access admin utility foundation
+
+Это означает:
+ • storage уже реально использует access layer
+ • подготовлена база под guild / NPC / world / faction storage
+ • можно выдавать и снимать доступ к storage через utility-bridge между Storage и Access
+
+⸻
+
+9. Что зафиксировано по версиям
+
+9.1. Предыдущая крупная фиксация
+
+К моменту перехода на текущий этап был зафиксирован прогресс до:
+ • v7.3.7
+
+К этому моменту были зафиксированы:
+• access persistence
+ • storage + access integration
+ • storage permission utilities
+ • storage access admin utility foundation
+
+9.2. Текущая актуальная версия
+
+Текущая зафиксированная версия проекта:
+ • v7.3.8
+
+9.3. Что именно зафиксировано в v7.3.8
+
+В v7.3.8 завершён шаг:
+
+3.3.3.b — интеграция storage access admin команд в существующий RpgCommands.java
+
+Что зафиксировано:
+ • работа ведётся в реальном существующем файле
+src/main/java/ru/rpgcore/command/RpgCommands.java
+ • отдельный RpgStorageCommand.java не используется и не придумывается
+ • в существующую ветку /rpg storage admin ... добавлены практические команды:
+ • grant
+ • revoke
+ • list
+ • access system стала не только архитектурной, но и практической частью игрового управления storage rules
+ • compile-check пройден
+ • актуальная версия выгружена в GitHub
+
+⸻
+
+10. Правила работы с кодом
+
+При любой дальнейшей разработке соблюдать следующий порядок:
+ 1. Сначала проверять GitHub-репозиторий JambyED/rpg_core_engine
+ 2. Не гадать по памяти, если файл можно прочитать из репозитория
+ 3. Если меняется существующий файл — при риске поломки давать полный код под замену
+ 4. Если нужен новый файл — явно указывать путь и имя
+ 5. Не давать опасные фрагменты вместо полной замены большого файла
+ 6. Не перепрыгивать через foundation-steps
+ 7. Не ломать существующую архитектуру
+ 8. Не смешивать core и addon logic
+ 9. Не забывать, что ядро строится под будущие аддоны, но само контентом не становится
+
+10.1. Нельзя создавать параллельные системы
+
+Если в ядре уже существует subsystem (access, storage, economy и т.д.),
+запрещено создавать альтернативную реализацию рядом.
+
+Все расширения должны идти через:
+ • существующие API
+ • существующие сервисы
+ • существующие модели
+
+11. Обязательный GitHub / Git process
+
+GitHub — это не резервная копия, а основной источник истины по проекту и контроль состояния разработки.
+
+11.1. Среда работы
+
+Используется:
+ • PowerShell
+
+Корень проекта:
+ • C:\Users\jacki\OneDrive\Desktop\MinecraftDev\rpg_core\forge-mdk
+
+11.2. После каждого завершённого значимого этапа обязательно:
+ 1. Зафиксировать изменения через git
+ 2. Дать полный набор команд для PowerShell
+ 3. Указать версию
+ 4. Описать, что фиксируется
+ 5. Не переходить к следующему этапу без фиксации предыдущего
+
+11.3. Базовый формат команд фиксации
+
+cd "C:\Users\jacki\OneDrive\Desktop\MinecraftDev\rpg_core\forge-mdk"
+git status
+git add .
+git commit -m "vX.Y.Z - <краткое описание завершённого этапа>"
+git push
+git tag vX.Y.Z
+git push origin vX.Y.Z
+
+Если нужно сначала подтянуть изменения:
+
+cd "C:\Users\jacki\OneDrive\Desktop\MinecraftDev\rpg_core\forge-mdk"
+git status
+git add .
+git commit -m "vX.Y.Z - <краткое описание завершённого этапа>"
+git pull --rebase
+git push
+git tag vX.Y.Z
+git push origin vX.Y.Z
+
+11.4. Обязательные правила git-процесса
+ • версии должны идти последовательно
+ • описание коммита должно отражать реально завершённый этап
+ • нельзя пропускать фиксацию
+ • нельзя продолжать разработку без фиксации предыдущего состояния
+ • каждый этап разработки должен завершаться git-фиксацией
+
+Разработка без фиксации в GitHub считается нарушением процесса и не допускается.
+
+⸻
+
+12. Следующая актуальная дорожная карта ядра после v7.3.8
+
+После завершения v7.3.8 следующий roadmap выглядит так.
+
+12.1. Service GUI Framework
+
+Нужно сделать:
+ • service screen base
+ • server-authoritative service state / menu
+ • widgets
+ • action API
+ • hybrid GUI hooks
+
+Это обязательно под:
+ • банки
+ • торговлю
+ • сервисных NPC
+ • административные окна
+ • гильдейские сервисы
+
+Это следующий крупный infrastructural блок после завершения practical/admin completion для access/storage.
+
+Service GUI Framework является обязательным инфраструктурным мостом между:
+ • core systems (economy, storage, access)
+ • и будущими аддонами (NPC, guild, shops, services)
+
+Он не является "визуальным дополнением", а является частью runtime execution layer.
+
+Этот этап должен быть завершён полностью перед переходом к NPC / Dialogue / Services.
+
+12.2. Action / Condition System
+
+Нужно сделать:
+ • action model
+ • condition model
+ • action execution service
+ • result / feedback framework
+
+Это обязательно под:
+ • NPC
+ • cutscenes
+ • quests
+ • service GUI
+ • dialogue branching
+ • map triggers
+ • world interactions
+
+12.3. Dialogue System
+
+Нужно сделать:
+ • dialogue nodes
+ • choices
+ • conditions
+ • actions
+ • transitions
+ • dialogue runtime
+ • базовое dialogue GUI
+
+Это база под:
+ • NPC Addon
+ • Cutscene Addon
+ • quest system
+
+12.4. Reputation / Relation System
+
+Нужно сделать:
+ • reputation storage
+ • reputation service
+ • relation-based conditions
+ • hooks под NPC, доступы и диалоги
+
+12.5. Marker / Map Core
+
+Нужно сделать:
+ • marker data model
+ • runtime marker service
+ • visibility rules
+ • hooks под minimap / world map addon
+
+12.6. UI / UX Core Polish
+
+Это обязательный блок ядра.
+
+Нужно сделать:
+ • финальный визуал HUD
+ • единый стиль GUI
+ • единый стиль service GUI
+ • улучшение UX
+ • стандартизацию подсказок, ошибок, визуальных карточек и интерфейсной логики
+
+Это нельзя откладывать в бесконечное “потом”.
+
+12.7. Final Core Stabilization
+
+Нужно сделать:
+ • API cleanup
+ • command cleanup
+ • debug cleanup
+ • release-ready baseline
+ • version freeze
+
+⸻
+
+13. Что нельзя потерять при дальнейшей разработке
+
+Нельзя потерять:
+ • принцип “ядро = инфраструктура”
+ • список утверждённых аддонов
+ • то, что NPC Addon включает базовую quest system
+ • то, что Cutscene Addon требует editor
+ • то, что визуал HUD/GUI обязателен в ядре
+ • то, что access, economy, storage и service GUI — фундамент под будущие аддоны
+ • то, что мы уже прошли большой путь и не начинаем архитектуру заново
+ • то, что GitHub-фиксация обязательна после каждого завершённого этапа
+ • то, что новый код всегда проверяется в контексте уже существующего репозитория
+
+⸻
+
+14. Текущий рабочий статус
+
+На текущий момент:
+ • GitHub читается и используется как source of truth
+ • access core уже собран
+ • storage + access integration уже есть
+ • practical/admin layer для storage access уже доведён до уровня командного управления
+ • актуальная зафиксированная версия:
+ • v7.3.8
+
+Следующий новый этап должен начинаться только после фиксации актуальной дорожной карты в отдельном текстовом файле и её выгрузки в GitHub.
